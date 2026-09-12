@@ -141,3 +141,22 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Raw development working directories (kept local)
+/CARS/
+/workflow image/
+
+# Duplicate, test, and unstandardized 3D models
+public/CARS/
+public/models/cars/
+public/models/*test*.glb
+public/models/202*
+public/models/*_seagull.glb
+public/models/*_model_y.glb
+
+# Temporary development images & crops
+public/images/*_backup.*
+public/images/debug_stage_crop.png
+public/images/charging/crop_*.png
+public/images/charging/skyline_sample.png
+public/images/charging/chatgpt_shared_image.png
