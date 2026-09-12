@@ -96,8 +96,8 @@ export const Welcome: React.FC = () => {
       <div className="absolute inset-0 z-0 bg-gradient-to-r from-[#040711]/90 via-transparent to-[#040711]/90 pointer-events-none" />
 
       {/* 2. Full-Bleed 3D Showroom Stage (3D Car & Turntable) */}
-      <div className="absolute inset-0 z-0 w-full h-full min-h-[300px]">
-        <ShowroomStage selectedCar={selectedCar} autoRotate={true} />
+      <div className="hidden lg:block absolute inset-0 z-0 w-full h-full min-h-[300px]">
+        <ShowroomStage selectedCar={selectedCar} autoRotate={true} hideTitle={true} />
       </div>
 
       {/* 3. Top-Level Layered UI Wrapper (Floating above the 3D scene) */}
@@ -209,8 +209,84 @@ export const Welcome: React.FC = () => {
               </div>
             </div>
 
-            {/* ZONE 2: Center Safe Space (Transparent for direct 3D Car View & Orbit Interaction - 5 Cols) */}
-            <div className="hidden lg:block lg:col-span-5 h-full pointer-events-none" />
+            {/* ZONE 2: Dedicated Center Showcase Space for Chosen Car & Quick Choice Selector (5 Cols) */}
+            <div className="lg:col-span-5 w-full flex flex-col items-center justify-between pointer-events-auto py-2 space-y-3 z-20">
+              {/* Prominent Chosen Vehicle Header */}
+              <div className="flex flex-col items-center text-center space-y-1 bg-[#070D1A]/80 backdrop-blur-xl border border-white/10 px-5 py-2.5 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#2DD4BF] animate-pulse" />
+                  <span className="text-[10px] font-mono tracking-[0.2em] text-[#2DD4BF] font-bold uppercase">
+                    CHOSEN VEHICLE
+                  </span>
+                  {selectedCar.badge && (
+                    <span className="px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-semibold text-slate-300 border border-white/10">
+                      {selectedCar.badge}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide uppercase">
+                  {selectedCar.name}
+                </h2>
+              </div>
+
+              {/* Mobile/Tablet dedicated 3D interactive viewport */}
+              <div className="block lg:hidden w-full h-64 sm:h-80 relative rounded-3xl overflow-hidden border border-white/10 bg-[#060A14]/70 backdrop-blur-sm shadow-2xl">
+                <ShowroomStage selectedCar={selectedCar} autoRotate={true} hideTitle={true} />
+              </div>
+
+              {/* Quick Car Choice Switcher Pills */}
+              <div className="w-full space-y-1.5">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase tracking-wider">
+                    Quick Switch Model
+                  </span>
+                  <span className="text-[9px] font-mono text-[#2DD4BF]">
+                    {AVAILABLE_CARS.length} EV Models
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
+                  {AVAILABLE_CARS.map((car) => {
+                    const isSelected = selectedCar.id === car.id;
+                    return (
+                      <button
+                        key={car.id}
+                        type="button"
+                        onClick={() => handleSelectCar(car)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#2DD4BF] text-slate-950 border-[#2DD4BF] shadow-[0_0_15px_rgba(45,212,191,0.5)] scale-105'
+                            : 'bg-[#0B1322]/80 hover:bg-white/10 text-slate-300 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <Car className="w-3.5 h-3.5" />
+                        <span className="text-[11px] whitespace-nowrap">{car.name.replace(/^(BYD|Tesla|Audi|BMW|Mercedes)\s+/, '')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Floating Bottom Telemetry / Spec Ribbon for Chosen Car */}
+              <div className="w-full grid grid-cols-4 gap-1.5 p-2.5 rounded-2xl bg-[#060A14]/85 backdrop-blur-xl border border-white/10 shadow-lg text-center">
+                <div className="flex flex-col items-center">
+                  <span className="text-[9px] text-slate-400 font-mono">BATTERY</span>
+                  <span className="text-xs font-black text-white font-mono">{selectedCar.capacity}</span>
+                </div>
+                <div className="flex flex-col items-center border-l border-white/5">
+                  <span className="text-[9px] text-slate-400 font-mono">RANGE</span>
+                  <span className="text-xs font-black text-[#2DD4BF] font-mono">{selectedCar.range}</span>
+                </div>
+                <div className="flex flex-col items-center border-l border-white/5">
+                  <span className="text-[9px] text-slate-400 font-mono">0-100</span>
+                  <span className="text-xs font-black text-white font-mono">{selectedCar.acceleration}</span>
+                </div>
+                <div className="flex flex-col items-center border-l border-white/5">
+                  <span className="text-[9px] text-slate-400 font-mono">DRIVE</span>
+                  <span className="text-xs font-black text-white font-mono truncate max-w-[65px]">{selectedCar.drive.split(' ')[0]}</span>
+                </div>
+              </div>
+            </div>
 
             {/* ZONE 3: Right Column - Frosted Glassmorphism Setup Panel (3 Cols) */}
             <div className="lg:col-span-3 max-w-[325px] w-full mx-auto lg:ml-auto lg:mr-0 pointer-events-auto">

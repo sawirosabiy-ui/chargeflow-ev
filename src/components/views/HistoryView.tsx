@@ -264,29 +264,29 @@ export const HistoryView: React.FC = () => {
         <div className="lg:col-span-8 space-y-4">
           <div className={`p-5 sm:p-6 rounded-3xl border ${isCream ? "bg-white border-stone-200 shadow-sm" : "border-white/10 bg-[#0E131F]"} space-y-5 shadow-2xl`}>
             {/* Table Search & Export Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="text-[11px] font-mono font-bold tracking-widest text-[#2DD4BF] uppercase">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 min-w-0">
+              <div className="text-[11px] font-mono font-bold tracking-widest text-[#2DD4BF] uppercase shrink-0">
                 {t.sessionHistoryTitle}
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${isCream ? "bg-stone-100 text-stone-800" : "bg-[#131A29]"} border border-white/5 text-xs text-white`}>
-                  <Search className="w-3.5 h-3.5 text-slate-400" />
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${isCream ? "bg-stone-100 text-stone-800" : "bg-[#131A29]"} border border-white/5 text-xs text-white flex-1 min-w-[150px] sm:w-48 md:w-56 sm:flex-initial`}>
+                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <input
                     type="text"
                     placeholder={t.searchSessionsPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent outline-none flex-1 text-xs text-white placeholder:text-slate-500"
+                    className="bg-transparent outline-none w-full text-xs text-white placeholder:text-slate-500"
                   />
                 </div>
 
-                <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${isCream ? "bg-stone-100 text-stone-800" : "bg-[#131A29]"} border border-white/5 text-xs font-medium text-slate-300 hover:text-white`}>
+                <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl shrink-0 ${isCream ? "bg-stone-100 text-stone-800 hover:bg-stone-200" : "bg-[#131A29] hover:bg-[#1A2338]"} border border-white/5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer`}>
                   <Filter className="w-3.5 h-3.5 text-[#2DD4BF]" />
                   <span>{t.filterBtn}</span>
                 </button>
 
-                <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${isCream ? "bg-stone-100 text-stone-800" : "bg-[#131A29]"} border border-white/5 text-xs font-medium text-slate-300 hover:text-white`}>
+                <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl shrink-0 ${isCream ? "bg-stone-100 text-stone-800 hover:bg-stone-200" : "bg-[#131A29] hover:bg-[#1A2338]"} border border-white/5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer`}>
                   <Download className="w-3.5 h-3.5 text-[#2DD4BF]" />
                   <span>{t.exportBtn}</span>
                 </button>

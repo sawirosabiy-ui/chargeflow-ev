@@ -18,15 +18,21 @@ export const VehicleCutout: React.FC<VehicleCutoutProps> = ({
   const [imgError, setImgError] = useState(false);
   const normalized = (modelId + ' ' + modelName).toLowerCase().replace(/[\s_]+/g, '-');
 
-  // Determine matching photorealistic studio image
+  // Determine matching photorealistic studio image with full coverage
   let photoUrl = '';
   if (normalized.includes('seagull')) {
     photoUrl = paintColor && (paintColor.includes('84cc16') || paintColor.includes('10b981') || paintColor.includes('green') || paintColor.includes('lime'))
       ? '/images/cars/byd-seagull-green.jpg'
       : '/images/cars/byd-seagull.jpg';
-  } else if (normalized.includes('tesla') || normalized.includes('model-y')) {
+  } else if (normalized.includes('tesla') || normalized.includes('model-y') || normalized.includes('model-3')) {
     photoUrl = '/images/cars/tesla-model-y.jpg';
   } else if (normalized.includes('atto')) {
+    photoUrl = '/images/cars/byd-atto-3.jpg';
+  } else if (normalized.includes('seal') || normalized.includes('sealion') || normalized.includes('polestar')) {
+    photoUrl = '/images/cars/byd-atto-3.jpg';
+  } else if (normalized.includes('song') || normalized.includes('u8') || normalized.includes('u9')) {
+    photoUrl = '/images/cars/byd-atto-3.jpg';
+  } else {
     photoUrl = '/images/cars/byd-atto-3.jpg';
   }
 

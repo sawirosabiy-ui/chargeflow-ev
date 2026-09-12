@@ -10,6 +10,7 @@ interface ShowroomStageProps {
   selectedCar: CarSpec;
   autoRotate?: boolean;
   className?: string;
+  hideTitle?: boolean;
 }
 
 const ResponsiveCamera: React.FC<{
@@ -31,6 +32,7 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
   selectedCar = AVAILABLE_CARS[0],
   autoRotate: propAutoRotate = true,
   className = 'w-full h-full',
+  hideTitle = false,
 }) => {
   const [interactiveAutoRotate, setInteractiveAutoRotate] = useState(propAutoRotate);
 
@@ -118,12 +120,14 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
         </group>
       </Canvas>
 
-      {/* Floating 360° Sign & Chosen Car Name as H2 under the Car */}
+      {/* Floating 360° Sign & Chosen Car Name under the Car */}
       <div className="absolute bottom-6 sm:bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-10 space-y-2 text-center pointer-events-none">
         {/* Chosen Car Name as an H2 */}
-        <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-widest text-white uppercase drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
-          {selectedCar.name}
-        </h2>
+        {!hideTitle && (
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-widest text-white uppercase drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
+            {selectedCar.name}
+          </h2>
+        )}
 
         {/* 360° Interactive Toggle Badge */}
         <button

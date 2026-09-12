@@ -171,7 +171,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       theme: 'dark',
       completionNotification: null,
       isAuthModalOpen: false,
-      authModalMode: 'signin',
+      authModalMode: 'signup',
 
       // User & Vehicle
       user: {
@@ -329,7 +329,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'cream' : 'dark' })),
       setTheme: (theme) => set({ theme }),
       dismissCompletionNotification: () => set({ completionNotification: null }),
-      openAuthModal: (mode = 'signin') => set({ isAuthModalOpen: true, authModalMode: mode }),
+      openAuthModal: (mode = 'signup') => set({ isAuthModalOpen: true, authModalMode: mode }),
       closeAuthModal: () => set({ isAuthModalOpen: false }),
 
       updateUserProfile: (profile) => set((state) => ({

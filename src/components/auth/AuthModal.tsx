@@ -31,7 +31,14 @@ export const AuthModal: React.FC = () => {
   const { t } = useTranslation();
   const isCream = theme === "cream";
 
-  const [mode, setMode] = useState<"signin" | "signup">(authModalMode || "signin");
+  const [mode, setMode] = useState<"signin" | "signup">(authModalMode || "signup");
+
+  // Synchronize mode whenever modal is opened
+  React.useEffect(() => {
+    if (isAuthModalOpen) {
+      setMode(authModalMode || "signup");
+    }
+  }, [isAuthModalOpen, authModalMode]);
 
   // Sign In Fields
   const [signInIdentifier, setSignInIdentifier] = useState("+251 91 234 5678");

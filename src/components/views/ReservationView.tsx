@@ -26,6 +26,61 @@ import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 import { useTranslation } from '../../localization/useTranslation';
 import { VehicleCutout } from '../vehicle/VehicleCutout';
 
+interface BayDispenserVisualProps {
+  status: 'available' | 'charging' | 'reserved' | 'offline';
+  power?: string;
+}
+
+const BayDispenserVisual: React.FC<BayDispenserVisualProps> = ({ status, power = '120 kW' }) => {
+  const color = 
+    status === 'available' ? '#2DD4BF' :
+    status === 'charging' ? '#38BDF8' :
+    status === 'reserved' ? '#F59E0B' : '#EF4444';
+
+  return (
+    <div className="w-16 h-22 mx-auto flex flex-col items-center justify-center relative my-1 select-none">
+      {/* Background Soft Glow */}
+      <div 
+        className="absolute inset-0 rounded-2xl blur-lg opacity-30 pointer-events-none" 
+        style={{ backgroundColor: color }}
+      />
+      {/* High-Tech DC Fast Charging Pedestal */}
+      <div className="relative z-10 w-12 h-20 rounded-xl bg-gradient-to-b from-[#1C2638] via-[#0F172A] to-[#0A0E1A] border border-white/15 p-1 flex flex-col items-center justify-between shadow-xl">
+        {/* Illuminated Status Crown */}
+        <div 
+          className={`w-full h-1.5 rounded-full ${status === 'charging' ? 'animate-pulse' : ''}`}
+          style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
+        />
+        
+        {/* Digital OLED Telemetry Screen */}
+        <div className="w-9 h-7 rounded-md bg-[#040810] border border-white/10 p-0.5 flex flex-col items-center justify-center text-center">
+          <Zap className="w-2.5 h-2.5" style={{ color }} />
+          <span className="text-[7px] font-mono font-bold text-white leading-none mt-0.5">{power}</span>
+        </div>
+
+        {/* Dual Cable Connector Ports */}
+        <div className="w-full flex items-center justify-center gap-1">
+          <div className="w-2.5 h-3 rounded-sm bg-slate-800 border border-white/20 flex items-center justify-center">
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: color }}></span>
+          </div>
+          <div className="w-2.5 h-3 rounded-sm bg-slate-800 border border-white/20 flex items-center justify-center">
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: color }}></span>
+          </div>
+        </div>
+
+        {/* Bottom Stabilizer Plate */}
+        <div className="w-10 h-1 bg-slate-700/80 rounded-full" />
+      </div>
+
+      {/* Ground Reflection Halo */}
+      <div 
+        className="absolute -bottom-1 w-10 h-1 rounded-full blur-xs opacity-80"
+        style={{ backgroundColor: color }}
+      />
+    </div>
+  );
+};
+
 export const ReservationView: React.FC = () => {
   const user = useChargeFlowStore((s) => s.user);
   const vehicle = useChargeFlowStore((s) => s.vehicle);
@@ -114,14 +169,17 @@ export const ReservationView: React.FC = () => {
         </div>
       </div>
 
-      {/* Top Station Banner Card (Matches Screenshot exactly) */}
-      <div className={`rounded-3xl border overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-12 items-center ${isCream ? "bg-white border-stone-200" : "border-white/10 bg-[#0C101A]"}`}>
+      {/* Top Station Banner Card */}
+      <div className={`rounded-3xl border overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-12 items-stretch ${isCream ? "bg-white border-stone-200" : "border-white/10 bg-[#0C101A]"}`}>
 
         {/* Left: Station Night Photo with Illuminated Canopy */}
-        <div className="md:col-span-4 h-52 md:h-full relative overflow-hidden bg-slate-900 group">
+        <div className="md:col-span-4 min-h-[220px] md:min-h-[260px] h-full self-stretch relative overflow-hidden bg-slate-900 group">
           <img 
-            src="/images/stations/addis-hub-banner-exact.jpg" 
+            src="/images/stations/addis-ev-hub.jpg" 
             alt="Addis EV Hub" 
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "/images/stations/kazanchis.jpg";
+            }}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
           />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0C101A]/30 to-[#0C101A] z-10 hidden md:block"></div>
@@ -230,15 +288,8 @@ export const ReservationView: React.FC = () => {
                   ● AVAILABLE
                 </span>
 
-                {/* Real Charger Dispenser Photo */}
-                <div className="w-12 h-20 mx-auto flex items-center justify-center relative my-0.5">
-                  <img 
-                    src="/images/stations/bay-dispenser.jpg" 
-                    alt="Bay 03 120kW Dispenser" 
-                    className="w-full h-full object-contain rounded-lg drop-shadow-[0_0_15px_rgba(45,212,191,0.7)]" 
-                  />
-                  <div className="absolute -bottom-1 w-8 h-1 bg-[#2DD4BF] blur-sm rounded-full"></div>
-                </div>
+                {/* Real Charger Dispenser Visual */}
+                <BayDispenserVisual status="available" power="120 kW" />
 
                 <div className="space-y-1 text-[10px] text-slate-300">
                   <div className="font-semibold text-white">120 kW DC Fast</div>
@@ -267,15 +318,8 @@ export const ReservationView: React.FC = () => {
                   ● CHARGING
                 </span>
 
-                {/* Real Charger Dispenser Photo */}
-                <div className="w-12 h-20 mx-auto flex items-center justify-center relative my-0.5">
-                  <img 
-                    src="/images/stations/bay-dispenser.jpg" 
-                    alt="Bay 01 120kW Dispenser" 
-                    className="w-full h-full object-contain rounded-lg drop-shadow-[0_0_12px_rgba(14,165,233,0.6)]" 
-                  />
-                  <div className="absolute -bottom-1 w-8 h-1 bg-cyan-400 blur-sm rounded-full"></div>
-                </div>
+                {/* Real Charger Dispenser Visual */}
+                <BayDispenserVisual status="charging" power="120 kW" />
 
                 <div className="space-y-1 text-[10px] text-slate-300">
                   <div className="font-semibold text-white">120 kW DC Fast</div>
@@ -308,15 +352,8 @@ export const ReservationView: React.FC = () => {
                   ● RESERVED
                 </span>
 
-                {/* Real Charger Dispenser Photo */}
-                <div className="w-12 h-20 mx-auto flex items-center justify-center relative my-0.5">
-                  <img 
-                    src="/images/stations/bay-dispenser.jpg" 
-                    alt="Bay 02 120kW Dispenser" 
-                    className="w-full h-full object-contain rounded-lg brightness-95 hue-rotate-45 drop-shadow-[0_0_12px_rgba(245,158,11,0.5)]" 
-                  />
-                  <div className="absolute -bottom-1 w-8 h-1 bg-amber-400 blur-sm rounded-full"></div>
-                </div>
+                {/* Real Charger Dispenser Visual */}
+                <BayDispenserVisual status="reserved" power="120 kW" />
 
                 <div className="space-y-1 text-[10px] text-slate-300">
                   <div className="font-semibold text-white">120 kW DC Fast</div>
@@ -344,15 +381,8 @@ export const ReservationView: React.FC = () => {
                   ● AVAILABLE
                 </span>
 
-                {/* Real Charger Dispenser Photo */}
-                <div className="w-12 h-20 mx-auto flex items-center justify-center relative my-0.5">
-                  <img 
-                    src="/images/stations/bay-dispenser.jpg" 
-                    alt="Bay 04 120kW Dispenser" 
-                    className="w-full h-full object-contain rounded-lg drop-shadow-[0_0_12px_rgba(45,212,191,0.5)]" 
-                  />
-                  <div className="absolute -bottom-1 w-8 h-1 bg-[#2DD4BF] blur-sm rounded-full"></div>
-                </div>
+                {/* Real Charger Dispenser Visual */}
+                <BayDispenserVisual status="available" power="120 kW" />
 
                 <div className="space-y-1 text-[10px] text-slate-300">
                   <div className="font-semibold text-white">120 kW DC Fast</div>
@@ -375,14 +405,8 @@ export const ReservationView: React.FC = () => {
                   ● OFFLINE
                 </span>
 
-                {/* Real Charger Dispenser Photo */}
-                <div className="w-12 h-20 mx-auto flex items-center justify-center relative my-0.5">
-                  <img 
-                    src="/images/stations/bay-dispenser.jpg" 
-                    alt="Bay 05 120kW Dispenser" 
-                    className="w-full h-full object-contain rounded-lg grayscale brightness-50 opacity-40" 
-                  />
-                </div>
+                {/* Real Charger Dispenser Visual */}
+                <BayDispenserVisual status="offline" power="120 kW" />
 
                 <div className="space-y-1 text-[10px] text-slate-400">
                   <div className="font-semibold text-slate-400">120 kW DC Fast</div>
