@@ -10,7 +10,8 @@ import {
   BatteryCharging,
   ArrowRight,
   Check,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
 } from "lucide-react";
 import { useChargeFlowStore } from "../../store/useChargeFlowStore";
 import { AVAILABLE_CARS, CarSpec } from "../../data/cars";
@@ -54,6 +55,7 @@ export const AuthModal: React.FC = () => {
   const [selectedCarId, setSelectedCarId] = useState("byd-atto-3");
   const [batterySoc, setBatterySoc] = useState(38);
   const [signUpError, setSignUpError] = useState("");
+  const [carDropdownOpen, setCarDropdownOpen] = useState(false);
 
   if (!isAuthModalOpen) return null;
 
@@ -363,33 +365,84 @@ export const AuthModal: React.FC = () => {
               </div>
             </div>
 
-            {/* EV Model Selection */}
-            <div className="space-y-1.5 pt-1">
+            {/* EV Model Selection Dropdown */}
+            <div className="space-y-1.5 pt-1 relative">
               <label className={`block text-[11px] font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
                 Select Your EV
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-32 overflow-y-auto pr-1">
-                {AVAILABLE_CARS.slice(0, 8).map((car) => (
-                  <button
-                    key={car.id}
-                    type="button"
-                    onClick={() => setSelectedCarId(car.id)}
-                    className={`p-2 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                      selectedCarId === car.id
-                        ? "bg-teal-500/20 border-teal-400 text-white shadow-sm ring-1 ring-teal-400/50"
-                        : isCream
-                          ? "bg-white border-stone-300 text-stone-800 hover:bg-stone-50"
-                          : "bg-[#050811] border-white/10 text-slate-300 hover:border-white/20"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-[10px] font-mono text-teal-400 font-bold">{car.brand}</span>
-                      {selectedCarId === car.id && <Check className="w-3 h-3 text-teal-400" />}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCarDropdownOpen(!carDropdownOpen)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center justify-between transition-all cursor-pointer ${
+                    isCream
+                      ? "bg-white border-stone-300 text-stone-900 hover:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                      : "bg-[#050811] border-white/10 text-white hover:border-teal-400 focus:ring-1 focus:ring-teal-400"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400 shrink-0">
+                      <Car className="w-4 h-4" />
                     </div>
-                    <div className="text-xs font-bold truncate mt-1">{car.name}</div>
-                    <div className="text-[9px] text-slate-400 font-mono">{car.rangeKm} km</div>
-                  </button>
-                ))}
+                    <div className="text-left truncate">
+                      {(() => {
+                        const selectedCar = AVAILABLE_CARS.find((c) => c.id === selectedCarId) || AVAILABLE_CARS[0];
+                        return (
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold truncate text-white">{selectedCar.name}</span>
+                            <span className="text-[10px] font-mono text-teal-400 font-semibold">({selectedCar.brand})</span>
+                            <span className={`text-[10px] font-mono hidden sm:inline ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                              • {selectedCar.rangeKm} km • {selectedCar.drive}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-teal-400 transition-transform shrink-0 ${carDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {carDropdownOpen && (
+                  <div className={`absolute top-full left-0 right-0 mt-1.5 max-h-52 overflow-y-auto rounded-2xl border shadow-2xl p-1.5 z-50 backdrop-blur-2xl space-y-1 ${
+                    isCream ? "bg-white border-stone-300 text-stone-900" : "bg-[#0C1220] border-white/15 text-slate-100"
+                  }`}>
+                    {AVAILABLE_CARS.map((car) => {
+                      const isSelected = selectedCarId === car.id;
+                      return (
+                        <button
+                          key={car.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCarId(car.id);
+                            setCarDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2.5 transition-all cursor-pointer ${
+                            isSelected
+                              ? isCream
+                                ? "bg-emerald-50 text-emerald-900 font-bold border border-emerald-300"
+                                : "bg-teal-500/20 text-teal-300 font-bold border border-teal-500/40"
+                              : isCream
+                                ? "text-stone-700 hover:bg-stone-100"
+                                : "text-slate-300 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold truncate">{car.name}</span>
+                                <span className="text-[10px] font-mono text-teal-400 uppercase">{car.brand}</span>
+                              </div>
+                              <div className={`text-[10px] font-mono mt-0.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                                {car.capacity} · {car.rangeKm} km Range · {car.drive}
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 text-teal-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
