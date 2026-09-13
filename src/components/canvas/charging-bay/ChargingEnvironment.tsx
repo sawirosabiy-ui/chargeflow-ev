@@ -19,6 +19,7 @@ interface ChargingEnvironmentProps {
   initialRotation?: number;
   targetRotation?: number;
   onRotationChange?: (angle: number) => void;
+  onUserInteraction?: () => void;
 }
 
 /**
@@ -40,6 +41,7 @@ export const ChargingEnvironment: React.FC<ChargingEnvironmentProps> = ({
   initialRotation = -Math.PI / 5.5,
   targetRotation,
   onRotationChange,
+  onUserInteraction,
 }) => {
   return (
     <group position={[0, 0, 0]}>
@@ -78,6 +80,7 @@ export const ChargingEnvironment: React.FC<ChargingEnvironmentProps> = ({
         initialRotation={initialRotation}
         targetRotation={targetRotation}
         onRotationChange={onRotationChange}
+        onUserInteraction={onUserInteraction}
       >
         <VehicleGroundingSystem
           surfaceY={0.0}

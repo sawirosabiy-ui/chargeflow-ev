@@ -12,6 +12,7 @@ interface AheStation3DStageProps {
   activeAngleIndex?: number;
   orbitRef?: React.RefObject<any>;
   batterySoc?: number;
+  onUserInteraction?: () => void;
 }
 
 // Active camera responder component inside Canvas to handle window resizes & mobile device aspect ratio changes immediately
@@ -36,6 +37,7 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
   zoom = 1.0,
   activeAngleIndex = 0,
   batterySoc = 66,
+  onUserInteraction,
 }) => {
   const { vehicle, theme } = useChargeFlowStore();
   const isComplete = batterySoc >= 100;
@@ -154,6 +156,7 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
               autoRotateSpeed={1.2}
               initialRotation={-Math.PI / 1.12}
               targetRotation={targetRotation}
+              onUserInteraction={onUserInteraction}
             >
               <VehicleStage
                 vehicleId={vehicle.id}

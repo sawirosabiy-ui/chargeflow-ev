@@ -127,6 +127,7 @@ export const AheChargingCockpit: React.FC = () => {
         zoom={zoom}
         activeAngleIndex={activeAngleIndex}
         batterySoc={batterySoc}
+        onUserInteraction={() => setAutoRotate(false)}
       />
 
       {/* 2. IN-CANVAS HEADER: Bay & Minimal Status Badge (Desktop Only, unified into AheBatteryHUD on mobile) */}

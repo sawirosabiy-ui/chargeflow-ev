@@ -85,6 +85,7 @@ export const Cockpit3DStage: React.FC<Cockpit3DStageProps> = React.memo(({
             autoRotate={interactiveAutoRotate}
             autoRotateSpeed={0.8}
             initialRotation={-Math.PI / 5.5}
+            onUserInteraction={() => setInteractiveAutoRotate(false)}
           >
             <VehicleStage
               key={vehicle.id}

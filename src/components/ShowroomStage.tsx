@@ -30,11 +30,15 @@ const ResponsiveCamera: React.FC<{
 
 export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
   selectedCar = AVAILABLE_CARS[0],
-  autoRotate: propAutoRotate = true,
+  autoRotate: propAutoRotate = false,
   className = 'w-full h-full',
   hideTitle = false,
 }) => {
   const [interactiveAutoRotate, setInteractiveAutoRotate] = useState(propAutoRotate);
+
+  useEffect(() => {
+    setInteractiveAutoRotate(propAutoRotate);
+  }, [propAutoRotate]);
 
   const [viewport, setViewport] = useState(() => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
@@ -95,6 +99,7 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
             autoRotate={interactiveAutoRotate}
             autoRotateSpeed={0.8}
             initialRotation={-Math.PI / 5.5}
+            onUserInteraction={() => setInteractiveAutoRotate(false)}
           >
             <VehicleStage
               key={selectedCar.id}

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 interface CarRotatorProps {
@@ -9,15 +9,18 @@ interface CarRotatorProps {
   initialRotation?: number;
   targetRotation?: number;
   onRotationChange?: (angle: number) => void;
+  onUserInteraction?: () => void;
 }
 
 /**
- * Ultra-Smooth CarRotator with Critically Damped Sub-Pixel Interpolation
- * - Immediate interruptibility: touching immediately halts inertia and gives 1:1 control.
- * - Sub-pixel smoothing: uses delta-independent damping (THREE.MathUtils.damp) to remove
- *   mouse/touch discrete event stepping and micro-stutters.
- * - Natural release glide: tracks rolling pointer velocity and smoothly glides to a stop on flick.
- * - Shortest-path angle easing: clicking presets glides smoothly to the target angle.
+ * Ultra-Smooth CarRotator with Direct Pointer & Touch Finger Tracking
+ * - Direct Canvas Binding: Attaches directly to the WebGL canvas via gl.domElement with touch-action: none.
+ * - Universal Input: Supports mouse drag, single-finger touch swipe, and pointer capture.
+ * - Gesture Prevention: Calls preventDefault() on touchmove to stop mobile browser page swipe/scroll conflicts.
+ * - Sub-Pixel Critically Damped Smoothing: THREE.MathUtils.damp removes discrete micro-stutters and input quantization.
+ * - Immediate Stop on Touch: Zeroes inertia immediately upon contact for 1:1 responsive tactile control.
+ * - Natural Momentum Glide: Rolling filtered velocity calculation produces a silky deceleration glide upon release.
+ * - Shortest-Path Easing: Seamlessly transitions to target angle when preset camera buttons are clicked.
  */
 export const CarRotator: React.FC<CarRotatorProps> = ({
   children,
@@ -26,8 +29,10 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
   initialRotation = 0,
   targetRotation,
   onRotationChange,
+  onUserInteraction,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
+  const { gl } = useThree();
   
   // Physical simulation refs
   const currentRotY = useRef(initialRotation);
@@ -54,24 +59,39 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
   }, [targetRotation]);
 
   useEffect(() => {
-    // 1. Pointer Down: Immediately cancel all momentum, auto-rotation, and take direct control
+    const canvas = gl.domElement;
+    if (!canvas) return;
+
+    // Guarantee browser touch actions like scrolling and pinch-zoom don't interfere
+    canvas.style.touchAction = 'none';
+    canvas.style.userSelect = 'none';
+    (canvas.style as any).webkitUserSelect = 'none';
+
+    // 1. Pointer Down (Mouse & Stylus & Touch)
     const handlePointerDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName.toLowerCase() === 'canvas' || target.closest('canvas'))) {
-        isDragging.current = true;
-        activePointerId.current = e.pointerId;
-        lastClientX.current = e.clientX;
-        lastTimestamp.current = performance.now();
-        
-        // Zero out velocity instantly so car stops dead on finger contact
-        velocity.current = 0;
-        
-        // Align target to current to guarantee zero lurch or jump on touch
-        targetRotY.current = currentRotY.current;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+      isDragging.current = true;
+      activePointerId.current = e.pointerId;
+      lastClientX.current = e.clientX;
+      lastTimestamp.current = performance.now();
+      
+      // Stop all momentum instantly so car is locked to finger
+      velocity.current = 0;
+      targetRotY.current = currentRotY.current;
+
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // Fallback if browser doesn't support pointer capture
+      }
+
+      if (onUserInteraction) {
+        onUserInteraction();
       }
     };
 
-    // 2. Pointer Move: Instantaneous angular update with weighted rolling velocity estimation
+    // 2. Pointer Move: High-resolution angular update with rolling velocity
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDragging.current) return;
       if (activePointerId.current !== null && e.pointerId !== activePointerId.current) return;
@@ -87,20 +107,24 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
         const rotDelta = deltaX * 0.0075;
         targetRotY.current += rotDelta;
 
-        // Filtered velocity estimation in rad/sec for natural, non-jittery flick physics
+        // Rolling velocity estimation in rad/sec
         const instVelocity = (rotDelta / dt) * 1000;
-        velocity.current = velocity.current * 0.55 + instVelocity * 0.45;
+        velocity.current = velocity.current * 0.5 + instVelocity * 0.5;
       }
     };
 
-    // 3. Pointer Up & Cancel: Release drag with momentum glide
+    // 3. Pointer Up & Release
     const handlePointerUp = (e: PointerEvent) => {
       if (activePointerId.current !== null && e.pointerId === activePointerId.current) {
         isDragging.current = false;
         activePointerId.current = null;
 
-        // If the finger remained stationary for > 80ms before lifting, clear velocity (deliberate stop)
-        if (performance.now() - lastTimestamp.current > 80) {
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {}
+
+        // If finger remained stationary for > 70ms before lifting, deliberate stop
+        if (performance.now() - lastTimestamp.current > 70) {
           velocity.current = 0;
         } else {
           // Clamp flick velocity to comfortable cinematic max
@@ -109,18 +133,86 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
       }
     };
 
-    window.addEventListener('pointerdown', handlePointerDown, { passive: true });
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    window.addEventListener('pointerup', handlePointerUp, { passive: true });
-    window.addEventListener('pointercancel', handlePointerUp, { passive: true });
+    // 4. Native Touch Event Fallbacks (Prevents mobile Safari/Chrome swipe gesture conflict)
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        isDragging.current = true;
+        const touch = e.touches[0];
+        lastClientX.current = touch.clientX;
+        lastTimestamp.current = performance.now();
+        velocity.current = 0;
+        targetRotY.current = currentRotY.current;
+
+        if (onUserInteraction) {
+          onUserInteraction();
+        }
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging.current || e.touches.length === 0) return;
+      if (e.cancelable) {
+        e.preventDefault(); // Crucial: stops mobile browser navigation gestures
+      }
+
+      const touch = e.touches[0];
+      const now = performance.now();
+      const dt = Math.max(1, now - lastTimestamp.current);
+      const deltaX = touch.clientX - lastClientX.current;
+      lastClientX.current = touch.clientX;
+      lastTimestamp.current = now;
+
+      if (deltaX !== 0) {
+        const rotDelta = deltaX * 0.0075;
+        targetRotY.current += rotDelta;
+        const instVelocity = (rotDelta / dt) * 1000;
+        velocity.current = velocity.current * 0.5 + instVelocity * 0.5;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        if (performance.now() - lastTimestamp.current > 70) {
+          velocity.current = 0;
+        } else {
+          velocity.current = THREE.MathUtils.clamp(velocity.current, -6.5, 6.5);
+        }
+      }
+    };
+
+    // Attach to canvas directly for highest priority and exact element binding
+    canvas.addEventListener('pointerdown', handlePointerDown);
+    canvas.addEventListener('pointermove', handlePointerMove);
+    canvas.addEventListener('pointerup', handlePointerUp);
+    canvas.addEventListener('pointercancel', handlePointerUp);
+    canvas.addEventListener('lostpointercapture', handlePointerUp);
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    // Window-level safety listeners in case mouse drag leaves the canvas boundary
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
 
     return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
+      canvas.removeEventListener('pointerdown', handlePointerDown);
+      canvas.removeEventListener('pointermove', handlePointerMove);
+      canvas.removeEventListener('pointerup', handlePointerUp);
+      canvas.removeEventListener('pointercancel', handlePointerUp);
+      canvas.removeEventListener('lostpointercapture', handlePointerUp);
+
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
+
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, []);
+  }, [gl, onUserInteraction]);
 
   // Frame tick: 60fps/120fps delta-independent damping and physics
   useFrame((_, delta) => {
@@ -145,7 +237,7 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
     }
 
     // Critically damped interpolation removes all sensor pixel noise while keeping latency < 16ms
-    // Lambda 28 during drag provides instantaneous tactile tracking; lambda 16 gives cinematic smoothness
+    // Lambda 30 during drag provides instantaneous tactile tracking; lambda 16 gives cinematic smoothness
     const lambda = isDragging.current ? 30 : 16;
     currentRotY.current = THREE.MathUtils.damp(
       currentRotY.current,
