@@ -66,7 +66,7 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
   const cameraFov = baseFov;
 
   return (
-    <div className={`relative ${className} select-none cursor-grab active:cursor-grabbing w-full h-full`}>
+    <div className={`relative ${className} select-none cursor-grab active:cursor-grabbing w-full h-full touch-none`}>
       <Canvas
         camera={{ position: cameraPosition, fov: cameraFov, near: 0.1, far: 100 }}
         dpr={[1, 1.5]}
