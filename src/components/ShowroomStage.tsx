@@ -55,23 +55,12 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
   const isMobile = viewport.width < 640;
   const aspect = viewport.width / (viewport.height || 1);
 
-  let cameraZ = 4.65;
-  let cameraY = 0.44;
-  let baseFov = 34;
-  let stageScale = 1.0;
-  let stageY = -0.52;
-
-  if (aspect < 1.15) {
-    const targetFillRatio = isMobile ? 0.86 : 0.80;
-    const targetVisibleWidth = 3.45 / targetFillRatio;
-    cameraZ = isMobile ? 5.6 : 5.0;
-    cameraY = isMobile ? 0.40 : 0.42;
-    stageY = isMobile ? -0.50 : -0.52;
-    stageScale = isMobile ? 0.90 : 0.96;
-
-    const tanHalfVFov = targetVisibleWidth / (2 * cameraZ * aspect);
-    baseFov = (2 * Math.atan(tanHalfVFov) * 180) / Math.PI;
-  }
+  // Hero car camera framing: Car is larger, closer, and clearly fills the frame
+  let cameraZ = isMobile ? 4.1 : 4.2;
+  let cameraY = isMobile ? 0.36 : 0.38;
+  let baseFov = isMobile ? 38 : 34;
+  let stageScale = isMobile ? 1.45 : 1.35;
+  let stageY = isMobile ? -0.58 : -0.56;
 
   const cameraPosition: [number, number, number] = [0.0, cameraY, cameraZ];
   const cameraFov = baseFov;
@@ -120,26 +109,14 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
         </group>
       </Canvas>
 
-      {/* Floating 360° Sign & Chosen Car Name under the Car */}
-      <div className="absolute bottom-6 sm:bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-10 space-y-2 text-center pointer-events-none">
-        {/* Chosen Car Name as an H2 */}
-        {!hideTitle && (
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-widest text-white uppercase drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
+      {/* If title not hidden, display discrete title */}
+      {!hideTitle && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 text-center pointer-events-none">
+          <h2 className="text-lg sm:text-xl font-black tracking-widest text-white uppercase drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
             {selectedCar.name}
           </h2>
-        )}
-
-        {/* 360° Interactive Toggle Badge */}
-        <button
-          onClick={() => setInteractiveAutoRotate((v) => !v)}
-          className="flex items-center gap-2 text-xs font-semibold text-slate-300 bg-[#070B14]/85 hover:bg-[#070B14] backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.7)] transition-all cursor-pointer pointer-events-auto"
-        >
-          <RotateCw className={`w-3.5 h-3.5 text-[#2DD4BF] ${interactiveAutoRotate ? 'animate-spin' : ''}`} style={{ animationDuration: '5s' }} />
-          <span className="font-mono tracking-wider text-[#2DD4BF] font-bold text-[11px]">360° VIEW</span>
-          <span className="text-slate-600">•</span>
-          <span className="text-[10px] text-slate-300 tracking-wide font-medium">Click to toggle / Drag to rotate</span>
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 });

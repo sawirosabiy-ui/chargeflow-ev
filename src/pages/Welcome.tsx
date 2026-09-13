@@ -184,38 +184,53 @@ export const Welcome: React.FC = () => {
           </div>
         </section>
 
-        {/* Section B: 3D Vehicle Stage (The Hero Component) */}
-        <section className="relative w-full rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#060C17]/80 to-[#03060E]/90 shadow-2xl p-3 sm:p-6 flex flex-col items-center">
-          {/* Subtle 360 View Indicator (Small, non-intrusive) */}
-          <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 border border-white/10 backdrop-blur-md text-[10px] font-mono text-teal-300">
-            <RotateCw className="w-3 h-3 text-teal-400 animate-spin" style={{ animationDuration: '6s' }} />
-            <span>360° View • Drag to rotate</span>
+        {/* Section B: 3D Vehicle Stage (Hero Component matching IMPROVED design) */}
+        <section className="relative w-full rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#060C17]/95 via-[#040813] to-[#02050B] shadow-2xl p-4 sm:p-6 flex flex-col items-center">
+          
+          {/* Top Row: Left Subtle 360° VIEW badge | Right Brand & Car Name */}
+          <div className="w-full flex items-start justify-between z-20 pointer-events-none pb-2">
+            {/* Top-Left: Subtle 360° VIEW Indicator with Rotate Icon */}
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-left">
+              <RotateCw className="w-4 h-4 text-teal-400 shrink-0" />
+              <div>
+                <div className="text-[10px] font-mono font-black text-teal-300 uppercase tracking-widest leading-none">
+                  360° VIEW
+                </div>
+                <div className="text-[9px] text-slate-400 mt-0.5 leading-none">
+                  Drag to rotate
+                </div>
+              </div>
+            </div>
+
+            {/* Top-Right: Brand & Car Model Name */}
+            <div className="text-right">
+              <div className="text-[11px] font-mono font-black text-teal-400 uppercase tracking-widest">
+                {selectedCar.brand}
+              </div>
+              <div className="text-sm sm:text-base font-black text-white tracking-wide">
+                {selectedCar.name}
+              </div>
+            </div>
           </div>
 
-          {/* Selected Vehicle Name Badge */}
-          <div className="absolute top-4 right-4 z-20 text-right">
-            <div className="text-xs font-mono font-bold text-teal-400 uppercase tracking-widest">{selectedCar.brand}</div>
-            <div className="text-sm sm:text-base font-black text-white">{selectedCar.name}</div>
-          </div>
-
-          {/* 3D Canvas Box (Unhidden on Mobile & Desktop) */}
-          <div className="w-full h-64 sm:h-80 lg:h-96 relative flex items-center justify-center">
+          {/* 3D Canvas Box: Prominent Hero Car (Close-up, crisp, no clutter) */}
+          <div className="w-full h-72 sm:h-84 lg:h-[420px] relative flex items-center justify-center -my-2 sm:my-0">
             <ShowroomStage selectedCar={selectedCar} autoRotate={true} hideTitle={true} />
           </div>
 
-          {/* Live Specs Ribbon */}
-          <div className="w-full max-w-2xl grid grid-cols-3 gap-2 sm:gap-4 pt-3 border-t border-white/10 text-center font-mono">
-            <div className="p-2 sm:p-3 rounded-2xl bg-white/5 border border-white/5">
-              <div className="text-[10px] text-slate-400 font-sans">Battery SoC</div>
-              <div className="text-xs sm:text-sm font-bold text-emerald-400 mt-0.5">{startingSoc}%</div>
+          {/* Live Specs Ribbon (Battery SoC, Est. Range, Powertrain) */}
+          <div className="w-full max-w-2xl grid grid-cols-3 gap-2.5 sm:gap-4 pt-3 border-t border-white/10 text-center font-mono z-10">
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+              <div className="text-[10px] text-slate-400 font-sans font-medium">Battery SoC</div>
+              <div className="text-sm sm:text-base font-black text-emerald-400 mt-0.5">{startingSoc}%</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-2xl bg-white/5 border border-white/5">
-              <div className="text-[10px] text-slate-400 font-sans">Est. Range</div>
-              <div className="text-xs sm:text-sm font-bold text-white mt-0.5">{estimatedRange} km</div>
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+              <div className="text-[10px] text-slate-400 font-sans font-medium">Est. Range</div>
+              <div className="text-sm sm:text-base font-black text-white mt-0.5">{estimatedRange} km</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-2xl bg-white/5 border border-white/5">
-              <div className="text-[10px] text-slate-400 font-sans">Powertrain</div>
-              <div className="text-xs sm:text-sm font-bold text-teal-300 mt-0.5">{selectedCar.drive}</div>
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+              <div className="text-[10px] text-slate-400 font-sans font-medium">Powertrain</div>
+              <div className="text-sm sm:text-base font-black text-teal-300 mt-0.5">{selectedCar.drive}</div>
             </div>
           </div>
 
