@@ -51,6 +51,49 @@ export interface ChargeFlowState {
     stationName?: string;
   };
   setUnauthorizedModalOpen: (open: boolean, bayName?: string, stationName?: string) => void;
+
+  // Receipt & QR Code Modal
+  receiptModal: {
+    isOpen: boolean;
+    receiptNo: string;
+    date: string;
+    stationName: string;
+    bayNumber: string;
+    powerKw: number;
+    amountEtb: number;
+    status: string;
+    qrData: string;
+  } | null;
+  openReceiptModal: (data?: any) => void;
+  closeReceiptModal: () => void;
+
+  // Directions & Navigation Modal
+  directionsModal: {
+    isOpen: boolean;
+    stationName: string;
+    address: string;
+    distanceKm: number;
+    etaMin: number;
+    baysAvailable: string;
+    powerKw: number;
+  } | null;
+  openDirectionsModal: (station: {
+    name: string;
+    address?: string;
+    distanceKm?: number;
+    etaMin?: number;
+    baysAvailable?: string;
+    powerKw?: number;
+  }) => void;
+  closeDirectionsModal: () => void;
+
+  // Full Screen Map Mode
+  isFullScreenMap: boolean;
+  setIsFullScreenMap: (full: boolean) => void;
+
+  // Stop Charging Confirmation Modal
+  isStopChargingConfirmOpen: boolean;
+  setStopChargingConfirmOpen: (open: boolean) => void;
   pendingIntent: {
     view?: AppView;
     action?: string;
@@ -248,6 +291,48 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       },
       setUnauthorizedModalOpen: (open, bayName, stationName) =>
         set({ unauthorizedModal: { isOpen: open, bayName, stationName } }),
+
+      receiptModal: null,
+      openReceiptModal: (data) =>
+        set((state) => {
+          if (data) return { receiptModal: { ...data, isOpen: true } };
+          const res = state.reservation;
+          return {
+            receiptModal: {
+              isOpen: true,
+              receiptNo: `CF-${Date.now().toString().slice(-8)}`,
+              date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+              stationName: res?.stationName || 'Addis EV Hub',
+              bayNumber: res?.bayNumber || 'DC-03',
+              powerKw: 120,
+              amountEtb: 50.0,
+              status: 'PAID',
+              qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${res?.id || 'RES-01'}|PAID`,
+            },
+          };
+        }),
+      closeReceiptModal: () => set({ receiptModal: null }),
+
+      directionsModal: null,
+      openDirectionsModal: (station) =>
+        set({
+          directionsModal: {
+            isOpen: true,
+            stationName: station.name || 'Addis EV Hub',
+            address: station.address || 'Bole Road, Near Bole Medhanialem, Addis Ababa',
+            distanceKm: station.distanceKm || 2.4,
+            etaMin: station.etaMin || 7,
+            baysAvailable: station.baysAvailable || '4 / 6 bays available',
+            powerKw: station.powerKw || 120,
+          },
+        }),
+      closeDirectionsModal: () => set({ directionsModal: null }),
+
+      isFullScreenMap: false,
+      setIsFullScreenMap: (full) => set({ isFullScreenMap: full }),
+
+      isStopChargingConfirmOpen: false,
+      setStopChargingConfirmOpen: (open) => set({ isStopChargingConfirmOpen: open }),
 
       // Initial Guest User State (No fake hardcoded user)
       user: {
@@ -666,6 +751,18 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         saveUserReservation(userId, newReservation);
         const freshWallet = getUserWallet(userId);
 
+        const generatedReceipt = {
+          isOpen: true,
+          receiptNo: `CF-${Date.now().toString().slice(-8)}`,
+          date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+          stationName: station.name,
+          bayNumber: bay.name,
+          powerKw: bay.powerKw || 120,
+          amountEtb: depositFee,
+          status: 'PAID',
+          qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${newReservation.id}|STN:${station.id}|BAY:${bay.id}|PAID`,
+        };
+
         set({
           selectedStationId: station.id,
           selectedBayId: bay.id,
@@ -674,7 +771,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             transactions: freshWallet.transactions,
           },
           reservation: newReservation,
-          currentView: isOccupied ? 'queue' : 'cockpit',
+          receiptModal: generatedReceipt,
+          currentView: isOccupied ? 'queue' : 'reservation',
         });
 
         return {

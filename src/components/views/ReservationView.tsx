@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { 
   ArrowLeft, 
+  ArrowRight,
   MapPin, 
   Zap, 
   Box, 
@@ -85,10 +86,13 @@ export const ReservationView: React.FC = () => {
   const user = useChargeFlowStore((s) => s.user);
   const vehicle = useChargeFlowStore((s) => s.vehicle);
   const wallet = useChargeFlowStore((s) => s.wallet);
+  const reservation = useChargeFlowStore((s) => s.reservation);
   const setView = useChargeFlowStore((s) => s.setView);
   const confirmReservation = useChargeFlowStore((s) => s.confirmReservation);
   const topupWalletBalance = useChargeFlowStore((s) => s.topupWalletBalance);
   const openAuthModal = useChargeFlowStore((s) => s.openAuthModal);
+  const openReceiptModal = useChargeFlowStore((s) => s.openReceiptModal);
+  const openDirectionsModal = useChargeFlowStore((s) => s.openDirectionsModal);
   const theme = useChargeFlowStore((s) => s.theme);
   const [reservationError, setReservationError] = useState('');
   const [showTopupModal, setShowTopupModal] = useState(false);
@@ -193,6 +197,69 @@ export const ReservationView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ACTIVE CONFIRMED RESERVATION BANNER */}
+      {reservation && (
+        <div className="p-5 rounded-3xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-emerald-500/10 border border-emerald-500/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider">
+                  ACTIVE RESERVATION CONFIRMED
+                </span>
+                <span className="text-xs font-mono text-emerald-400 font-bold">
+                  {reservation.bayNumber}
+                </span>
+              </div>
+              <p className={`text-xs mt-1 ${isCream ? 'text-stone-700' : 'text-slate-300'}`}>
+                {reservation.stationName} • {reservation.date} ({reservation.slotTime})
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <button
+              onClick={() => openReceiptModal()}
+              className="flex-1 md:flex-initial py-2.5 px-3.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <Zap className="w-3.5 h-3.5 text-teal-400" />
+              <span>VIEW RECEIPT & QR</span>
+            </button>
+
+            <button
+              onClick={() =>
+                openDirectionsModal({
+                  name: reservation.stationName,
+                  address: 'Bole Road, Addis Ababa',
+                  distanceKm: 0.8,
+                  etaMin: 2,
+                  baysAvailable: reservation.bayNumber,
+                  powerKw: 120,
+                })
+              }
+              className={`flex-1 md:flex-initial py-2.5 px-3.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                isCream
+                  ? 'bg-white border-stone-300 text-stone-800 hover:bg-stone-50'
+                  : 'border-white/20 bg-white/10 hover:bg-white/15 text-white'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5 text-teal-400" />
+              <span>GET DIRECTIONS</span>
+            </button>
+
+            <button
+              onClick={() => setView('charging')}
+              className="flex-1 md:flex-initial py-2.5 px-4 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+            >
+              <span>CHARGING COCKPIT</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Top Station Banner Card */}
       <div className={`rounded-3xl border overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-12 items-stretch ${isCream ? "bg-white border-stone-200" : "border-white/10 bg-[#0C101A]"}`}>

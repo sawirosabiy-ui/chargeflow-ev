@@ -12,6 +12,8 @@ import { HistoryView } from "./components/views/HistoryView";
 import { SettingsView } from "./components/views/SettingsView";
 import { AICopilotModal } from "./components/copilot/AICopilotModal";
 import { AuthModal } from "./components/auth/AuthModal";
+import { DirectionsModal } from "./components/modals/DirectionsModal";
+import { ReservationReceiptModal } from "./components/modals/ReservationReceiptModal";
 import { Zap, X, ArrowRight } from "lucide-react";
 
 export const App: React.FC = () => {
@@ -25,6 +27,7 @@ export const App: React.FC = () => {
   const isAuthModalOpen = useChargeFlowStore((s) => s.isAuthModalOpen);
   const authModalMode = useChargeFlowStore((s) => s.authModalMode);
   const closeAuthModal = useChargeFlowStore((s) => s.closeAuthModal);
+  const isFullScreenMap = useChargeFlowStore((s) => s.isFullScreenMap);
 
   // Global background charging ticker across all views
   useEffect(() => {
@@ -89,13 +92,13 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Persistent Collapsible Sidebar */}
-      <Sidebar />
+      {/* Persistent Collapsible Sidebar (hidden in full-screen map mode) */}
+      {!(currentView === "find_charge" && isFullScreenMap) && <Sidebar />}
 
       {/* Main App Workspace */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        {/* Top Header Bar */}
-        <Header />
+        {/* Top Header Bar (hidden in full-screen map mode) */}
+        {!(currentView === "find_charge" && isFullScreenMap) && <Header />}
 
         {/* Dynamic Screen Views */}
         <main className="flex-1 overflow-hidden flex flex-col relative min-w-0">
@@ -114,6 +117,10 @@ export const App: React.FC = () => {
 
       {/* Auth Modal */}
       <AuthModal />
+
+      {/* Global Directions & Receipt Modals */}
+      <DirectionsModal />
+      <ReservationReceiptModal />
     </div>
   );
 };

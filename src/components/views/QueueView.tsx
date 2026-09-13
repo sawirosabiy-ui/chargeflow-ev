@@ -19,6 +19,7 @@ export const QueueView: React.FC = () => {
   const setView = useChargeFlowStore((s) => s.setView);
   const startChargingSession = useChargeFlowStore((s) => s.startChargingSession);
   const setReadyToCharge = useChargeFlowStore((s) => s.setReadyToCharge);
+  const openDirectionsModal = useChargeFlowStore((s) => s.openDirectionsModal);
   const theme = useChargeFlowStore((s) => s.theme);
   const { t } = useTranslation();
   const isCream = theme === 'cream';
@@ -52,6 +53,61 @@ export const QueueView: React.FC = () => {
 
   return (
     <div className={`flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7 space-y-6 select-none font-sans transition-colors duration-300 ${isCream ? "bg-[#FAF8F5] text-stone-900" : "bg-[#070B12] text-slate-100"}`}>
+
+      {/* 0. PROMINENT "YOUR TURN" BANNER WHEN AUTHORIZED */}
+      {isReady && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/10 border-2 border-emerald-500/50 shadow-[0_0_35px_rgba(16,185,129,0.3)] animate-in fade-in slide-in-from-top-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shrink-0">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-mono text-[11px] font-black uppercase tracking-wider">
+                  ✓ YOUR TURN
+                </span>
+                <span className="text-xs sm:text-sm font-mono font-bold text-emerald-400">
+                  {reservation?.bayNumber || 'Bay 02'} is ready for your vehicle
+                </span>
+              </div>
+              <p className={`text-xs ${isCream ? 'text-stone-700' : 'text-slate-300'}`}>
+                Please connect your vehicle within 5 minutes.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full md:w-auto">
+            <button
+              onClick={() =>
+                openDirectionsModal({
+                  name: reservation?.stationName || 'Addis EV Hub',
+                  address: 'Bole Road, Addis Ababa',
+                  distanceKm: 0.8,
+                  etaMin: 2,
+                  baysAvailable: reservation?.bayNumber || 'Bay 02',
+                  powerKw: 120,
+                })
+              }
+              className={`flex-1 md:flex-initial py-3 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                isCream
+                  ? 'bg-white border-stone-300 text-stone-800 hover:bg-stone-50'
+                  : 'bg-white/10 hover:bg-white/15 border-white/20 text-white'
+              }`}
+            >
+              <Navigation className="w-4 h-4 text-teal-400" />
+              <span>GET DIRECTIONS TO BAY</span>
+            </button>
+
+            <button
+              onClick={handleStartCharging}
+              className="flex-1 md:flex-initial py-3 px-5 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.5)] transition-all cursor-pointer"
+            >
+              <Zap className="w-4 h-4 fill-slate-950" />
+              <span>START CHARGING</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -445,7 +501,7 @@ export const QueueView: React.FC = () => {
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(45,212,191,0.4)] transition-all hover:scale-[1.01] cursor-pointer animate-pulse"
                 >
                   <Zap className="w-4 h-4 fill-slate-950" />
-                  <span>Connect & Start Charging Now</span>
+                  <span>START CHARGING</span>
                 </button>
               ) : (
                 <div className="space-y-2">
@@ -470,11 +526,20 @@ export const QueueView: React.FC = () => {
               )}
 
               <button
-                onClick={() => setView('find_charge')}
+                onClick={() =>
+                  openDirectionsModal({
+                    name: reservation?.stationName || 'Addis EV Hub',
+                    address: 'Bole Road, Addis Ababa',
+                    distanceKm: 0.8,
+                    etaMin: 2,
+                    baysAvailable: reservation?.bayNumber || 'Bay 02',
+                    powerKw: 120,
+                  })
+                }
                 className={`w-full py-3 rounded-2xl border font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${isCream ? "bg-stone-100 hover:bg-stone-200 border-stone-300 text-stone-800" : "bg-[#131A29] hover:bg-slate-800 border-white/10 text-slate-300 hover:text-white"}`}
               >
-                <Navigation className="w-4 h-4" />
-                <span>{t.navigateStationBtn}</span>
+                <Navigation className="w-4 h-4 text-teal-400" />
+                <span>GET DIRECTIONS</span>
               </button>
             </div>
           </div>

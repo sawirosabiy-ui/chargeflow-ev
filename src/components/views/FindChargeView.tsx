@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 import { useTranslation } from '../../localization/useTranslation';
+import { Maximize2, Minimize2, Navigation, Plus, Minus } from 'lucide-react';
 
 interface StationDetail {
   id: string;
@@ -48,12 +49,20 @@ export const FindChargeView: React.FC = () => {
   const setView = useChargeFlowStore((s) => s.setView);
   const theme = useChargeFlowStore((s) => s.theme);
   const requireAuth = useChargeFlowStore((s) => s.requireAuth);
+  const openDirectionsModal = useChargeFlowStore((s) => s.openDirectionsModal);
+  const isFullScreenMap = useChargeFlowStore((s) => s.isFullScreenMap);
+  const setIsFullScreenMap = useChargeFlowStore((s) => s.setIsFullScreenMap);
   const isCream = theme === 'cream';
 
   // Sub-views for mobile: 'map' (main screen), 'detail' (Station Details), 'filter' (Filters modal/view), 'nearby' (Nearby Stations list)
   const [mobileSubView, setMobileSubView] = useState<'map' | 'detail' | 'filter' | 'nearby'>('map');
   const [searchQuery, setSearchQuery] = useState('');
   const [isBookmarked, setIsBookmarked] = useState<Record<string, boolean>>({ 'addis-ev-hub': true });
+  const [quickFilter, setQuickFilter] = useState<'ALL' | 'AVAILABLE' | 'DC_FAST' | 'AC' | 'GBT' | 'CCS' | '50KW'>('ALL');
+  const [mapZoom, setMapZoom] = useState(1.0);
+  const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = React.useRef({ x: 0, y: 0, startPanX: 0, startPanY: 0 });
 
   // Filter states
   const [speedFilter, setSpeedFilter] = useState<'all' | 'fast' | 'ac'>('all');
@@ -150,6 +159,23 @@ export const FindChargeView: React.FC = () => {
       pinCount: 3,
     },
   ];
+
+  // Filtered station list based on quickFilter and search
+  const filteredStations = STATIONS.filter((st) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = st.name.toLowerCase().includes(q);
+      const matchType = st.type.toLowerCase().includes(q);
+      if (!matchName && !matchType) return false;
+    }
+    if (quickFilter === 'AVAILABLE') return st.status === 'available';
+    if (quickFilter === 'DC_FAST') return st.powerKw >= 50;
+    if (quickFilter === 'AC') return st.powerKw <= 22;
+    if (quickFilter === 'GBT') return st.connectors.includes('GB/T');
+    if (quickFilter === 'CCS') return st.connectors.includes('CCS');
+    if (quickFilter === '50KW') return st.powerKw >= 50;
+    return true;
+  });
 
   const [selectedStation, setSelectedStation] = useState<StationDetail>(STATIONS[0]);
 
@@ -462,14 +488,31 @@ export const FindChargeView: React.FC = () => {
             </div>
           </div>
 
-          {/* Sticky Bottom CTA: Reserve Charger */}
-          <div className="fixed bottom-0 inset-x-0 p-4 bg-[#070B12]/95 backdrop-blur-xl border-t border-white/10 z-30">
+          {/* Sticky Bottom Actions: Prominent Get Directions & Reserve for 50 ETB */}
+          <div className="fixed bottom-0 inset-x-0 p-4 bg-[#070B12]/95 backdrop-blur-xl border-t border-white/10 z-30 grid grid-cols-2 gap-3">
             <button
-              onClick={() => handleReserve(selectedStation)}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(45,212,191,0.5)] transition-transform hover:scale-[1.01] cursor-pointer"
+              type="button"
+              onClick={() => openDirectionsModal({
+                name: selectedStation.name,
+                address: 'Bole Road, Near Bole Medhanialem, Addis Ababa',
+                distanceKm: selectedStation.distanceKm,
+                etaMin: 7,
+                baysAvailable: `${selectedStation.pinCount} / ${selectedStation.chargersCount} bays available`,
+                powerKw: selectedStation.powerKw,
+              })}
+              className="py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-teal-300 border border-teal-500/30 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
-              <span>Reserve Charger</span>
-              <ArrowRight className="w-4 h-4" />
+              <Navigation className="w-4 h-4 stroke-[2.5]" />
+              <span>GET DIRECTIONS</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleReserve(selectedStation)}
+              className="py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-transform hover:scale-[1.01] cursor-pointer"
+            >
+              <span>RESERVE FOR 50 ETB</span>
+              <ArrowRight className="w-4 h-4 stroke-[3]" />
             </button>
           </div>
         </div>
@@ -563,6 +606,31 @@ export const FindChargeView: React.FC = () => {
                 <p className="text-[10px] text-slate-400">Find the best charger near you</p>
               </div>
             </div>
+
+            {/* Full-Screen Map Mode Toggle Button */}
+            <button
+              onClick={() => setIsFullScreenMap(!isFullScreenMap)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md border text-xs font-bold transition-all shadow-lg cursor-pointer ${
+                isFullScreenMap
+                  ? 'bg-teal-500 text-slate-950 border-teal-400'
+                  : 'bg-[#08101E]/85 hover:bg-white/10 border-white/15 text-teal-300'
+              }`}
+              title={isFullScreenMap ? "Exit Fullscreen" : "Expand to Full Screen Map"}
+            >
+              {isFullScreenMap ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Exit Fullscreen</span>
+                  <span className="sm:hidden">Exit</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Full Map</span>
+                  <span className="sm:hidden">Full</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Search Input */}
@@ -577,41 +645,82 @@ export const FindChargeView: React.FC = () => {
             />
           </div>
 
-          {/* Quick Filter Pill Badges */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <button 
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/20 border border-teal-400 text-teal-300 text-xs font-bold shrink-0 shadow-sm"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Available (12)</span>
-            </button>
-
-            <button 
-              className="px-3 py-1.5 rounded-xl bg-[#0E1524]/80 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white text-xs font-semibold shrink-0"
-            >
-              DC Fast
-            </button>
-
-            <button 
-              className="px-3 py-1.5 rounded-xl bg-[#0E1524]/80 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white text-xs font-semibold shrink-0"
-            >
-              GB/T
-            </button>
+          {/* Quick Filter Pill Badges matching user prompt */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs font-bold">
+            {[
+              { id: 'ALL', label: 'ALL' },
+              { id: 'AVAILABLE', label: 'AVAILABLE', icon: true },
+              { id: 'DC_FAST', label: 'DC FAST' },
+              { id: 'AC', label: 'AC' },
+              { id: 'GBT', label: 'GB/T' },
+              { id: 'CCS', label: 'CCS' },
+              { id: '50KW', label: '50+ kW' },
+            ].map((chip) => {
+              const active = quickFilter === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setQuickFilter(chip.id as any)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer border ${
+                    active
+                      ? 'bg-teal-500/25 border-teal-400 text-teal-300 shadow-[0_0_12px_rgba(45,212,191,0.3)]'
+                      : 'bg-[#0E1524]/80 backdrop-blur-md border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  {chip.icon && <Zap className="w-3 h-3 fill-current text-emerald-400" />}
+                  <span>{chip.label}</span>
+                </button>
+              );
+            })}
 
             <button 
               onClick={() => setMobileSubView('filter')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0E1524]/80 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white text-xs font-semibold shrink-0 cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0E1524]/80 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white text-xs font-semibold shrink-0 cursor-pointer"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <SlidersHorizontal className="w-3 h-3" />
               <span>More</span>
             </button>
           </div>
         </div>
 
-        {/* High-Tech Dark Addis Ababa Map Canvas */}
-        <div className="w-full h-full relative bg-[#040711] overflow-hidden">
-          {/* Map Vector Graphic */}
-          <svg className="absolute inset-0 w-full h-full opacity-65" xmlns="http://www.w3.org/2000/svg">
+        {/* High-Tech Dark Addis Ababa Map Canvas with Pan & Zoom */}
+        <div 
+          onPointerDown={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('.cursor-pointer')) return;
+            setIsPanning(true);
+            panStartRef.current = {
+              x: e.clientX,
+              y: e.clientY,
+              startPanX: mapPan.x,
+              startPanY: mapPan.y,
+            };
+          }}
+          onPointerMove={(e) => {
+            if (!isPanning) return;
+            const dx = e.clientX - panStartRef.current.x;
+            const dy = e.clientY - panStartRef.current.y;
+            setMapPan({
+              x: panStartRef.current.startPanX + dx,
+              y: panStartRef.current.startPanY + dy,
+            });
+          }}
+          onPointerUp={() => setIsPanning(false)}
+          onPointerCancel={() => setIsPanning(false)}
+          className={`w-full h-full relative bg-[#040711] overflow-hidden ${isPanning ? 'cursor-grabbing' : 'cursor-grab'} touch-none`}
+        >
+          {/* Scalable & Pannable Map Layer */}
+          <div 
+            style={{
+              transform: `translate(${mapPan.x}px, ${mapPan.y}px) scale(${mapZoom})`,
+              transformOrigin: '50% 50%',
+              transition: isPanning ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
+            }}
+            className="absolute inset-0 w-full h-full"
+          >
+            {/* Map Vector Graphic */}
+            <svg className="absolute inset-0 w-full h-full opacity-65" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern id="roadGrid" width="60" height="60" patternUnits="userSpaceOnUse">
                 <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(255, 255, 255, 0.02)" strokeWidth="1" />
@@ -659,8 +768,8 @@ export const FindChargeView: React.FC = () => {
             </div>
           </div>
 
-          {/* Station Map Pins */}
-          {STATIONS.map((st) => {
+          {/* Station Map Pins (Filtered by QuickFilter with Standard Availability Colors) */}
+          {filteredStations.map((st) => {
             const isSelected = selectedStation.id === st.id;
             return (
               <div 
@@ -682,21 +791,52 @@ export const FindChargeView: React.FC = () => {
             );
           })}
 
+          </div>
+
           {/* Google Watermark */}
-          <div className="absolute bottom-28 left-4 z-20 text-[11px] font-bold text-slate-500/70 select-none pointer-events-none">
+          <div className="absolute bottom-32 left-4 z-20 text-[11px] font-bold text-slate-500/70 select-none pointer-events-none">
             Google
           </div>
 
-          {/* Floating Right Map Tool Action Buttons */}
-          <div className="absolute right-3.5 top-[35%] z-20 flex flex-col gap-2 pointer-events-auto">
-            <button className="w-9 h-9 rounded-full bg-[#08101E]/85 backdrop-blur-md border border-white/15 flex items-center justify-center text-slate-300 hover:text-white shadow-lg cursor-pointer">
-              <Crosshair className="w-4 h-4" />
+          {/* Floating Right Map Tool Action Buttons: Zoom & Location */}
+          <div className="absolute right-3.5 top-[32%] z-20 flex flex-col gap-2 pointer-events-auto">
+            {/* Zoom In */}
+            <button 
+              onClick={() => setMapZoom((prev) => Math.min(2.0, +(prev + 0.15).toFixed(2)))}
+              className="w-9 h-9 rounded-xl bg-[#08101E]/90 backdrop-blur-md border border-white/15 flex items-center justify-center text-slate-200 hover:text-white shadow-lg cursor-pointer hover:bg-white/10 transition-colors"
+              title="Zoom In"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
             </button>
-            <button className="w-9 h-9 rounded-full bg-[#08101E]/85 backdrop-blur-md border border-white/15 flex items-center justify-center text-slate-300 hover:text-white shadow-lg cursor-pointer">
-              <Layers className="w-4 h-4" />
+
+            {/* Zoom Out */}
+            <button 
+              onClick={() => setMapZoom((prev) => Math.max(0.75, +(prev - 0.15).toFixed(2)))}
+              className="w-9 h-9 rounded-xl bg-[#08101E]/90 backdrop-blur-md border border-white/15 flex items-center justify-center text-slate-200 hover:text-white shadow-lg cursor-pointer hover:bg-white/10 transition-colors"
+              title="Zoom Out"
+            >
+              <Minus className="w-4 h-4 stroke-[2.5]" />
             </button>
-            <button className="w-9 h-9 rounded-full bg-[#08101E]/85 backdrop-blur-md border border-white/15 flex items-center justify-center text-teal-400 shadow-lg cursor-pointer">
-              <Compass className="w-4 h-4" />
+
+            {/* Recenter Location */}
+            <button 
+              onClick={() => {
+                setMapZoom(1.0);
+                setMapPan({ x: 0, y: 0 });
+              }}
+              className="w-9 h-9 rounded-xl bg-[#08101E]/90 backdrop-blur-md border border-white/15 flex items-center justify-center text-teal-400 hover:text-teal-300 shadow-lg cursor-pointer hover:bg-white/10 transition-colors"
+              title="Recenter Map"
+            >
+              <Crosshair className="w-4 h-4 stroke-[2.5]" />
+            </button>
+
+            {/* Fullscreen Toggle */}
+            <button 
+              onClick={() => setIsFullScreenMap(!isFullScreenMap)}
+              className="w-9 h-9 rounded-xl bg-[#08101E]/90 backdrop-blur-md border border-white/15 flex items-center justify-center text-teal-400 hover:text-teal-300 shadow-lg cursor-pointer hover:bg-white/10 transition-colors"
+              title="Toggle Fullscreen"
+            >
+              {isFullScreenMap ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
           </div>
 
@@ -745,18 +885,32 @@ export const FindChargeView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Amenities & View Details Arrow */}
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-                <div className="flex items-center gap-3 text-slate-400 text-xs">
-                  <span title="Parking">🅿️</span>
-                  <span title="Restrooms">🚻</span>
-                  <span title="Cafe">☕</span>
-                  <span className="text-[10px] font-mono text-slate-400">Open 24/7</span>
-                </div>
-                <div className="flex items-center gap-1 text-[11px] font-bold text-teal-400 group-hover:translate-x-0.5 transition-transform">
-                  <span>Details</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </div>
+              {/* Prominent Action Buttons: Get Directions & Reserve for 50 ETB */}
+              <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => openDirectionsModal({
+                    name: selectedStation.name,
+                    address: 'Bole Road, Near Bole Medhanialem, Addis Ababa',
+                    distanceKm: selectedStation.distanceKm,
+                    etaMin: 7,
+                    baysAvailable: `${selectedStation.pinCount} / ${selectedStation.chargersCount} bays available`,
+                    powerKw: selectedStation.powerKw,
+                  })}
+                  className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-teal-300 border border-teal-500/30 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Navigation className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>GET DIRECTIONS</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleReserve(selectedStation)}
+                  className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.35)] transition-all hover:scale-[1.01] cursor-pointer"
+                >
+                  <span>RESERVE FOR 50 ETB</span>
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+                </button>
               </div>
             </div>
 

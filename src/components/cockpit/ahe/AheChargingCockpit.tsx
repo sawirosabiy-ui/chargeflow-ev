@@ -26,6 +26,8 @@ export const AheChargingCockpit: React.FC = () => {
     theme,
     unauthorizedModal,
     setUnauthorizedModalOpen,
+    isStopChargingConfirmOpen,
+    setStopChargingConfirmOpen,
   } = useChargeFlowStore();
 
   const isCream = theme === "cream";
@@ -90,9 +92,7 @@ export const AheChargingCockpit: React.FC = () => {
   };
 
   const handleStop = () => {
-    playSoundChime("stop");
-    stopChargingSession();
-    setIsSessionModalOpen(true);
+    setStopChargingConfirmOpen(true);
   };
 
   // Zoom handlers for 3D Camera
@@ -275,6 +275,55 @@ export const AheChargingCockpit: React.FC = () => {
         batterySoc={batterySoc}
       />
 
+      {/* 10.25 STOP CHARGING CONFIRMATION DIALOG */}
+      {isStopChargingConfirmOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
+          <div className={`border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 animate-in zoom-in-95 duration-200 shadow-2xl text-center ${
+            isCream
+              ? "bg-[#FAF7F2] border-amber-900/15 text-slate-900"
+              : "bg-[#0B1220] border-amber-500/30 text-white"
+          }`}>
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+              <AlertCircle className="w-7 h-7 stroke-[2.5]" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-black tracking-tight uppercase">
+                STOP CHARGING?
+              </h3>
+              <p className={`text-xs leading-relaxed ${isCream ? "text-slate-600" : "text-slate-300"}`}>
+                Are you sure you want to stop charging and disconnect your vehicle? Your current charging session will end.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => setStopChargingConfirmOpen(false)}
+                className={`w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border cursor-pointer ${
+                  isCream
+                    ? "bg-black/5 hover:bg-black/10 text-slate-700 border-black/10"
+                    : "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border-white/10"
+                }`}
+              >
+                CANCEL
+              </button>
+
+              <button
+                onClick={() => {
+                  setStopChargingConfirmOpen(false);
+                  playSoundChime("stop");
+                  stopChargingSession();
+                  setIsSessionModalOpen(true);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer"
+              >
+                YES, STOP CHARGING
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 10.5 CHARGING AUTHORIZATION BLOCKED MODAL */}
       {unauthorizedModal?.isOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
@@ -289,14 +338,17 @@ export const AheChargingCockpit: React.FC = () => {
 
             <div className="space-y-2">
               <div className="inline-block px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono text-[10px] font-bold uppercase tracking-wider">
-                Charger Reserved
+                Charging Not Authorized
               </div>
-              <h3 className="text-xl font-black tracking-tight">
-                Charger Reserved
+              <h3 className="text-xl font-black tracking-tight uppercase">
+                CHARGING NOT AUTHORIZED
               </h3>
               <p className={`text-xs leading-relaxed ${isCream ? "text-slate-600" : "text-slate-300"}`}>
-                This charger is currently reserved for another ChargeFlow user. You cannot start a charging session without an active reservation.
+                You need an active reservation before you can start charging. Please find a charger and complete the reservation process first.
               </p>
+              <div className="pt-1 text-xs font-mono font-bold text-teal-400">
+                Reservation fee: 50 ETB
+              </div>
             </div>
 
             <div className="space-y-2 pt-2">
@@ -307,21 +359,7 @@ export const AheChargingCockpit: React.FC = () => {
                 }}
                 className="w-full py-3.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer"
               >
-                FIND ANOTHER CHARGER
-              </button>
-
-              <button
-                onClick={() => {
-                  setUnauthorizedModalOpen(false);
-                  setView('reservation');
-                }}
-                className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold transition-colors border cursor-pointer ${
-                  isCream
-                    ? "bg-black/5 hover:bg-black/10 text-slate-700 border-black/10"
-                    : "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border-white/10"
-                }`}
-              >
-                Reserve This Bay (50 ETB Fee)
+                FIND A CHARGER
               </button>
             </div>
           </div>
