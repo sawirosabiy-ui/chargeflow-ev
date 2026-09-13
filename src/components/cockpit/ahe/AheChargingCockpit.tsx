@@ -11,7 +11,7 @@ import { AheActionButtons } from "./AheActionButtons";
 import { AheSessionModal } from "./AheSessionModal";
 import { AheHologramFloor } from "./AheHologramFloor";
 import { AICopilotModal } from "../../copilot/AICopilotModal";
-import { Hand, AlertCircle, ArrowRight, Zap } from "lucide-react";
+import { Hand, AlertCircle, ArrowRight, Zap, Lock } from "lucide-react";
 
 export const AheChargingCockpit: React.FC = () => {
   const { t } = useTranslation();
@@ -24,6 +24,8 @@ export const AheChargingCockpit: React.FC = () => {
     confirmReservation,
     setView,
     theme,
+    unauthorizedModal,
+    setUnauthorizedModalOpen,
   } = useChargeFlowStore();
 
   const isCream = theme === "cream";
@@ -84,9 +86,6 @@ export const AheChargingCockpit: React.FC = () => {
   // Handlers for charging session
   const handleStart = () => {
     playSoundChime("start");
-    if (!reservation) {
-      confirmReservation("eth-bole-01", "b3");
-    }
     startChargingSession();
   };
 
@@ -275,6 +274,59 @@ export const AheChargingCockpit: React.FC = () => {
         durationMinutes={Math.max(1, Math.floor(elapsedSeconds / 60))}
         batterySoc={batterySoc}
       />
+
+      {/* 10.5 CHARGING AUTHORIZATION BLOCKED MODAL */}
+      {unauthorizedModal?.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
+          <div className={`border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 animate-in zoom-in-95 duration-200 shadow-2xl text-center ${
+            isCream 
+              ? "bg-[#FAF7F2] border-amber-900/15 text-slate-900" 
+              : "bg-[#0B1220] border-rose-500/30 text-white"
+          }`}>
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+              <Lock className="w-7 h-7 stroke-[2.5]" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-block px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono text-[10px] font-bold uppercase tracking-wider">
+                Charger Reserved
+              </div>
+              <h3 className="text-xl font-black tracking-tight">
+                Charger Reserved
+              </h3>
+              <p className={`text-xs leading-relaxed ${isCream ? "text-slate-600" : "text-slate-300"}`}>
+                This charger is currently reserved for another ChargeFlow user. You cannot start a charging session without an active reservation.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={() => {
+                  setUnauthorizedModalOpen(false);
+                  setView('find_charge');
+                }}
+                className="w-full py-3.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer"
+              >
+                FIND ANOTHER CHARGER
+              </button>
+
+              <button
+                onClick={() => {
+                  setUnauthorizedModalOpen(false);
+                  setView('reservation');
+                }}
+                className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold transition-colors border cursor-pointer ${
+                  isCream
+                    ? "bg-black/5 hover:bg-black/10 text-slate-700 border-black/10"
+                    : "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border-white/10"
+                }`}
+              >
+                Reserve This Bay (50 ETB Fee)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 11. AI COPILOT CHATBOT ASSISTANT */}
       <AICopilotModal />

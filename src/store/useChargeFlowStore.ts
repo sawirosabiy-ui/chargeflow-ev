@@ -16,6 +16,9 @@ import {
   getUserActiveReservation,
   getUserHistory,
   recordUserCompletedSession,
+  isBayOccupiedOrReserved,
+  getBayQueueCount,
+  promoteNextInQueue,
 } from '../data/db';
 
 export interface PaymentMethodItem {
@@ -42,6 +45,12 @@ export interface ChargeFlowState {
   } | null;
   isAuthModalOpen: boolean;
   authModalMode: 'signin' | 'signup';
+  unauthorizedModal: {
+    isOpen: boolean;
+    bayName?: string;
+    stationName?: string;
+  };
+  setUnauthorizedModalOpen: (open: boolean, bayName?: string, stationName?: string) => void;
   pendingIntent: {
     view?: AppView;
     action?: string;
@@ -106,7 +115,17 @@ export interface ChargeFlowState {
     depositEtb: number;
     slotTime?: string;
     date?: string;
-    status: 'RESERVED' | 'QUEUED' | 'READY_TO_CHARGE' | 'CHARGING' | 'COMPLETED' | 'CANCELLED';
+    status:
+      | 'AVAILABLE'
+      | 'RESERVATION_PENDING'
+      | 'RESERVED'
+      | 'QUEUED'
+      | 'NEXT_IN_QUEUE'
+      | 'READY_TO_CHARGE'
+      | 'CHARGING'
+      | 'PAYMENT_PENDING'
+      | 'COMPLETED'
+      | 'CANCELLED';
     queuePosition?: number;
     arrivalDeadlineMin: number;
     pinConfirmed: boolean;
@@ -114,7 +133,7 @@ export interface ChargeFlowState {
 
   // Charging Session Engine
   chargingSession: {
-    status: 'IDLE' | 'CONNECTING' | 'CHARGING' | 'PAUSED' | 'COMPLETED' | 'STOPPED' | 'ERROR';
+    status: 'IDLE' | 'CONNECTING' | 'CHARGING' | 'PAUSED' | 'PAYMENT_PENDING' | 'COMPLETED' | 'STOPPED' | 'ERROR';
     powerKw: number;
     energyDeliveredKwh: number;
     totalCostEtb: number;
@@ -125,7 +144,7 @@ export interface ChargeFlowState {
 
   // Cinematic Single Cockpit State
   cockpitCharging: {
-    status: 'idle' | 'starting' | 'charging' | 'paused' | 'stopping' | 'complete';
+    status: 'idle' | 'starting' | 'charging' | 'paused' | 'stopping' | 'payment_pending' | 'complete';
     battery: number;
     targetBattery: number;
     chargingPower: number;
@@ -171,7 +190,13 @@ export interface ChargeFlowState {
   topupWalletBalance: (amount: number, method?: string) => void;
 
   // Reservation & Charging State Machine
-  confirmReservation: (stationId: string, bayId: string, slotTime?: string, date?: string) => { success: boolean; error?: string };
+  confirmReservation: (
+    stationId: string,
+    bayId: string,
+    slotTime?: string,
+    date?: string
+  ) => { success: boolean; error?: string; isQueued?: boolean; queuePosition?: number };
+  settleChargingPayment: (paymentMethod?: string) => { success: boolean; error?: string };
   setReadyToCharge: () => void;
   cancelActiveReservation: () => void;
   startChargingSession: () => boolean;
@@ -202,6 +227,7 @@ export type CinematicChargingStatus =
   | 'charging'
   | 'paused'
   | 'stopping'
+  | 'payment_pending'
   | 'complete';
 
 export const useChargeFlowStore = create<ChargeFlowState>()(
@@ -217,6 +243,11 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       isAuthModalOpen: false,
       authModalMode: 'signup',
       pendingIntent: null,
+      unauthorizedModal: {
+        isOpen: false,
+      },
+      setUnauthorizedModalOpen: (open, bayName, stationName) =>
+        set({ unauthorizedModal: { isOpen: open, bayName, stationName } }),
 
       // Initial Guest User State (No fake hardcoded user)
       user: {
@@ -559,7 +590,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         }
       },
 
-      // RESERVATION STATE MACHINE
+      // RESERVATION STATE MACHINE (Mandatory 50 ETB Fee & Anti-Double-Booking Guard)
       confirmReservation: (stationId, bayId, slotTime = '18:00 - 18:30', date = 'Today, May 16') => {
         const isAuth = get().requireAuth({
           view: 'reservation',
@@ -573,18 +604,18 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         const userId = get().user.id;
         const station = get().stations.find((s) => s.id === stationId) || get().stations[0];
         const bay = station.bays.find((b) => b.id === bayId) || station.bays[0];
-        const depositFee = 50.0; // Standard 50 ETB reservation fee
+        const depositFee = 50.0; // Standard 50 ETB reservation fee (Mandatory Step 1)
 
-        // Check wallet balance
+        // 1. Mandatory 50 ETB payment check
         const currentBalance = get().wallet.balanceEtb;
         if (currentBalance < depositFee) {
           return {
             success: false,
-            error: `Insufficient wallet balance (${currentBalance} ETB). 50 ETB reservation fee required.`,
+            error: 'Reservation not completed. Insufficient wallet balance (50 ETB required).',
           };
         }
 
-        // Deduct reservation fee from user-isolated ledger
+        // Deduct reservation fee BEFORE reservation is created
         const deduction = deductWalletFee(userId, depositFee, 'RESERVATION_FEE', {
           stationName: station.name,
           bayNumber: bay.name,
@@ -592,26 +623,45 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         });
 
         if (!deduction.success) {
-          return { success: false, error: deduction.error };
+          return { success: false, error: 'Reservation not completed. Payment was unsuccessful.' };
         }
 
-        // Create persistent user-isolated reservation
-        const newReservation: DbReservation = {
-          id: `RES-${Date.now().toString().slice(-4)}`,
-          userId,
-          stationId: station.id,
-          stationName: station.name,
-          bayId: bay.id,
-          bayNumber: bay.name,
-          depositEtb: depositFee,
-          slotTime,
-          date,
-          status: 'QUEUED',
-          queuePosition: 2, // Conceptually in line
-          arrivalDeadlineMin: 15,
-          pinConfirmed: true,
-          createdAt: Date.now(),
-        };
+        // 2. Check charger bay state to prevent double booking
+        const isOccupied = isBayOccupiedOrReserved(station.id, bay.id, userId);
+        const queueCount = getBayQueueCount(station.id, bay.id);
+
+        const newReservation: DbReservation = isOccupied
+          ? {
+              id: `RES-${Date.now().toString().slice(-4)}`,
+              userId,
+              stationId: station.id,
+              stationName: station.name,
+              bayId: bay.id,
+              bayNumber: bay.name,
+              depositEtb: depositFee,
+              slotTime,
+              date,
+              status: 'QUEUED',
+              queuePosition: queueCount + 1,
+              arrivalDeadlineMin: 15,
+              pinConfirmed: true,
+              createdAt: Date.now(),
+            }
+          : {
+              id: `RES-${Date.now().toString().slice(-4)}`,
+              userId,
+              stationId: station.id,
+              stationName: station.name,
+              bayId: bay.id,
+              bayNumber: bay.name,
+              depositEtb: depositFee,
+              slotTime,
+              date,
+              status: 'RESERVED',
+              arrivalDeadlineMin: 15,
+              pinConfirmed: true,
+              createdAt: Date.now(),
+            };
 
         saveUserReservation(userId, newReservation);
         const freshWallet = getUserWallet(userId);
@@ -623,24 +673,15 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             balanceEtb: freshWallet.balance,
             transactions: freshWallet.transactions,
           },
-          reservation: {
-            id: newReservation.id,
-            stationId: station.id,
-            stationName: station.name,
-            bayId: bay.id,
-            bayNumber: bay.name,
-            depositEtb: depositFee,
-            slotTime,
-            date,
-            status: 'QUEUED',
-            queuePosition: 2,
-            arrivalDeadlineMin: 15,
-            pinConfirmed: true,
-          },
-          currentView: 'queue',
+          reservation: newReservation,
+          currentView: isOccupied ? 'queue' : 'cockpit',
         });
 
-        return { success: true };
+        return {
+          success: true,
+          isQueued: isOccupied,
+          queuePosition: isOccupied ? newReservation.queuePosition : undefined,
+        };
       },
 
       setReadyToCharge: () => {
@@ -667,15 +708,35 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         });
       },
 
-      // CHARGING STATE MACHINE
+      // CHARGING STATE MACHINE (Strict Authorization Enforcement)
       startChargingSession: () => {
         const isAuth = get().requireAuth();
         if (!isAuth) return false;
 
         const res = get().reservation;
-        // Require valid reservation in READY_TO_CHARGE or RESERVED state
-        if (!res) {
-          set({ currentView: 'find_charge' });
+        const currentStation =
+          get().stations.find((s) => s.id === get().selectedStationId) || get().stations[0];
+        const bayName = res?.bayNumber || 'Bay 03';
+
+        // STRICT AUTHORIZATION CHECK:
+        // A charging session may ONLY start if:
+        // - The user has an active confirmed reservation for that exact charger
+        // - OR the user is NEXT_IN_QUEUE and assigned to the charger
+        const isAuthorized =
+          res !== null &&
+          (res.status === 'RESERVED' ||
+            res.status === 'READY_TO_CHARGE' ||
+            res.status === 'NEXT_IN_QUEUE');
+
+        if (!isAuthorized) {
+          // Block action & trigger unauthorized alert modal
+          set({
+            unauthorizedModal: {
+              isOpen: true,
+              bayName,
+              stationName: currentStation.name,
+            },
+          });
           return false;
         }
 
@@ -707,7 +768,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             reservation: state.reservation
               ? { ...state.reservation, status: 'CHARGING' }
               : null,
-            currentView: 'charging',
+            currentView: 'cockpit',
           };
         });
 
@@ -757,7 +818,39 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         }));
       },
 
+      // Stop energy delivery & enter PAYMENT_PENDING state
       stopChargingSession: () => {
+        const s = get().chargingSession;
+        const finalKwh = Number(s.energyDeliveredKwh.toFixed(2)) || 18.5;
+        const finalCost = Math.round(finalKwh * s.ratePerKwh) || 360;
+
+        const userId = get().user.id;
+        if (userId) {
+          updateReservationStatus(userId, 'PAYMENT_PENDING');
+        }
+
+        // Moves session to PAYMENT_PENDING. Charger bay is NOT released until user pays in AheSessionModal
+        set((state) => ({
+          chargingSession: {
+            ...state.chargingSession,
+            status: 'PAYMENT_PENDING',
+            powerKw: 0,
+            energyDeliveredKwh: finalKwh,
+            totalCostEtb: finalCost,
+          },
+          cockpitCharging: {
+            ...state.cockpitCharging,
+            status: 'payment_pending',
+            chargingPower: 0,
+          },
+          reservation: state.reservation
+            ? { ...state.reservation, status: 'PAYMENT_PENDING' }
+            : null,
+        }));
+      },
+
+      // End of Session Payment & Immediate Bay Release
+      settleChargingPayment: (paymentMethod = 'Telebirr') => {
         const userId = get().user.id;
         const s = get().chargingSession;
         const res = get().reservation;
@@ -765,33 +858,50 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
 
         const finalKwh = Number(s.energyDeliveredKwh.toFixed(2)) || 18.5;
         const finalCost = Math.round(finalKwh * s.ratePerKwh) || 360;
+        const stationName = res?.stationName || 'Addis EV Hub (Bole)';
+        const bayNumber = res?.bayNumber || 'Bay 03';
+        const stationId = res?.stationId || 'addis-ev-hub-bole';
+        const bayId = res?.bayId || 'bay-03';
 
-        // Deduct charging cost from wallet
         if (userId) {
-          deductWalletFee(userId, finalCost, 'CHARGING_SESSION', {
-            stationName: res?.stationName || 'Addis EV Hub (Bole)',
-            bayNumber: res?.bayNumber || 'Bay 03',
-            description: `Charging Session (${finalKwh} kWh delivered at ${s.ratePerKwh} ETB/kWh)`,
-          });
+          // If paying via wallet, deduct
+          if (paymentMethod === 'ChargeFlow Wallet' || paymentMethod === 'Wallet') {
+            const deduction = deductWalletFee(userId, finalCost, 'CHARGING_SESSION', {
+              stationName,
+              bayNumber,
+              description: `Charging Session (${finalKwh} kWh delivered at ${s.ratePerKwh} ETB/kWh)`,
+            });
+            if (!deduction.success) {
+              return { success: false, error: deduction.error || 'Insufficient wallet balance' };
+            }
+          }
 
-          // Record real completed session in DB
+          // Record completed session in DB ledger
           recordUserCompletedSession(userId, {
-            stationName: res?.stationName || 'Addis EV Hub (Bole)',
-            bayNumber: res?.bayNumber || 'Bay 03',
+            stationName,
+            bayNumber,
             vehicleModel: vehicle.model,
             energyKwh: finalKwh,
             costEtb: finalCost,
             durationMin: Math.max(1, Math.round(s.elapsedSeconds / 60)),
             batterySocStart: 38,
             batterySocEnd: vehicle.batterySoc || 90,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            paymentMethod: 'Telebirr',
+            date: new Date().toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            paymentMethod,
             transactionId: `TB-${Date.now().toString().slice(-8)}`,
             ratePerKwh: s.ratePerKwh,
           });
 
-          // Clear completed reservation
+          // Cancel/clear user's reservation
           cancelUserReservation(userId);
+
+          // FIFO QUEUE PROGRESSION:
+          // Check if queue exists for this bay and advance the earliest queued user
+          promoteNextInQueue(stationId, bayId);
         }
 
         const freshWallet = userId ? getUserWallet(userId) : { balance: 0, transactions: [] };
@@ -800,20 +910,29 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         const updatedHistory: ChargingHistoryRecord[] = freshSessions.map((sess) => ({
           id: sess.id,
           date: sess.date,
-          time: new Date(sess.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          time: new Date(sess.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
           stationName: sess.stationName,
           bayName: sess.bayNumber,
           energyKwh: sess.energyKwh,
           powerKw: 120,
           durationMin: sess.durationMin,
           totalCostEtb: sess.costEtb,
-          ratePerKwh: sess.ratePerKwh || 19.50,
-          paymentMethod: sess.paymentMethod || 'Telebirr',
+          ratePerKwh: sess.ratePerKwh || 19.5,
+          paymentMethod: sess.paymentMethod || paymentMethod,
           transactionId: sess.transactionId || `TB-${sess.id}`,
         }));
 
         set((state) => ({
-          chargingSession: { ...state.chargingSession, status: 'COMPLETED', powerKw: 0 },
+          chargingSession: {
+            ...state.chargingSession,
+            status: 'COMPLETED',
+            powerKw: 0,
+            energyDeliveredKwh: finalKwh,
+            totalCostEtb: finalCost,
+          },
           cockpitCharging: {
             ...state.cockpitCharging,
             status: 'complete',
@@ -828,11 +947,13 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           history: updatedHistory,
           completionNotification: {
             show: true,
-            message: `Charging completed: ${finalKwh} kWh delivered (${finalCost} ETB deducted from wallet).`,
+            message: `Payment complete: ${finalKwh} kWh delivered (${finalCost} ETB via ${paymentMethod}). Bay ${bayNumber} is now released.`,
             finalKwh,
             finalCostEtb: finalCost,
           },
         }));
+
+        return { success: true };
       },
 
       tickChargingSession: () => {

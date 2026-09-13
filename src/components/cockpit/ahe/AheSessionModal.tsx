@@ -1,5 +1,15 @@
-import React from 'react';
-import { CheckCircle2, ArrowRight, RotateCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  CheckCircle2, 
+  ArrowRight, 
+  RotateCcw, 
+  Zap, 
+  CreditCard, 
+  ShieldCheck, 
+  Check, 
+  Clock, 
+  AlertCircle 
+} from 'lucide-react';
 import { useChargeFlowStore } from '../../../store/useChargeFlowStore';
 import { useTranslation } from '../../../localization/useTranslation';
 
@@ -21,10 +31,32 @@ export const AheSessionModal: React.FC<AheSessionModalProps> = ({
   batterySoc,
 }) => {
   const { t } = useTranslation();
-  const { setView, reservation, theme } = useChargeFlowStore();
+  const { setView, reservation, theme, settleChargingPayment, wallet } = useChargeFlowStore();
   const isCream = theme === 'cream';
 
+  const [selectedMethod, setSelectedMethod] = useState<'Telebirr' | 'CBE Birr' | 'Chapa' | 'Wallet'>('Telebirr');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [txId, setTxId] = useState('');
+
   if (!isOpen) return null;
+
+  const handlePayAndFinish = () => {
+    setIsProcessing(true);
+    setErrorMsg('');
+
+    setTimeout(() => {
+      const res = settleChargingPayment(selectedMethod === 'Wallet' ? 'ChargeFlow Wallet' : selectedMethod);
+      setIsProcessing(false);
+      if (res.success) {
+        setTxId(`TB-${Date.now().toString().slice(-8)}`);
+        setIsPaid(true);
+      } else {
+        setErrorMsg(res.error || 'Payment failed. Please try again or select another payment method.');
+      }
+    }, 600);
+  };
 
   const handleGoToHistory = () => {
     onClose();
@@ -37,84 +69,181 @@ export const AheSessionModal: React.FC<AheSessionModalProps> = ({
   };
 
   const stationTitle = reservation?.stationName || t.stationHub;
+  const bayName = reservation?.bayNumber || 'Bay 03';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
-      <div className={`border rounded-3xl p-5 sm:p-7 max-w-md w-full space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-200 ${
+      <div className={`border rounded-3xl p-5 sm:p-7 max-w-md w-full space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200 shadow-2xl ${
         isCream
           ? 'bg-[#FAF7F2] border-amber-900/15 text-slate-900 shadow-[0_25px_60px_rgba(40,20,10,0.2)]'
           : 'bg-[#0A1220] border-teal-500/30 text-white shadow-[0_25px_60px_rgba(0,0,0,0.9)]'
       }`}>
-        {/* Header with Glowing Badge */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#06b6d4] to-[#10b981] flex items-center justify-center mx-auto text-slate-950 shadow-[0_0_25px_rgba(45,212,191,0.5)]">
-            <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
-          </div>
-          <h3 className={`text-xl font-black tracking-tight ${isCream ? 'text-slate-900' : 'text-white'}`}>
-            {t.chargingComplete}
-          </h3>
-          <p className={`text-xs ${isCream ? 'text-slate-600' : 'text-slate-400'}`}>
-            {stationTitle} • {t.sessionAtEnded}
-          </p>
-        </div>
-
-        {/* Metrics Summary Grid */}
-        <div className={`grid grid-cols-2 gap-3 p-4 rounded-2xl border ${
-          isCream ? 'bg-amber-50/60 border-amber-900/10' : 'bg-[#060B14] border-white/5'
-        }`}>
-          <div className={`p-3 rounded-xl ${isCream ? 'bg-white/80' : 'bg-white/[0.02]'}`}>
-            <div className="text-[10px] uppercase font-bold opacity-60">{t.energyDelivered}</div>
-            <div className={`text-lg font-black font-mono mt-0.5 ${isCream ? 'text-slate-900' : 'text-white'}`}>
-              {energyKwh.toFixed(1)} <span className="text-xs text-teal-500">kWh</span>
+        
+        {!isPaid ? (
+          <>
+            {/* 1. Header: Energy Delivery Stopped, Payment Due */}
+            <div className="text-center space-y-1.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                <Zap className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <h3 className={`text-xl font-black tracking-tight ${isCream ? 'text-slate-900' : 'text-white'}`}>
+                Session Ended — Settle Payment
+              </h3>
+              <p className={`text-xs ${isCream ? 'text-slate-600' : 'text-slate-400'}`}>
+                {stationTitle} • {bayName}
+              </p>
             </div>
-          </div>
 
-          <div className={`p-3 rounded-xl ${isCream ? 'bg-white/80' : 'bg-white/[0.02]'}`}>
-            <div className="text-[10px] uppercase font-bold opacity-60">{t.totalBilled}</div>
-            <div className="text-lg font-black text-emerald-500 font-mono mt-0.5">
-              {t.currencyEtb} {costEtb.toFixed(2)}
+            {/* 2. Metrics Breakdown */}
+            <div className={`grid grid-cols-2 gap-2.5 p-3 rounded-2xl border ${
+              isCream ? 'bg-amber-50/60 border-amber-900/10' : 'bg-[#060B14] border-white/5'
+            }`}>
+              <div className={`p-2.5 rounded-xl ${isCream ? 'bg-white/80' : 'bg-white/[0.02]'}`}>
+                <div className="text-[10px] uppercase font-bold opacity-60">Energy Delivered</div>
+                <div className={`text-base font-black font-mono mt-0.5 ${isCream ? 'text-slate-900' : 'text-white'}`}>
+                  {energyKwh.toFixed(1)} <span className="text-xs text-teal-500">kWh</span>
+                </div>
+              </div>
+
+              <div className={`p-2.5 rounded-xl ${isCream ? 'bg-white/80' : 'bg-white/[0.02]'}`}>
+                <div className="text-[10px] uppercase font-bold opacity-60">Final Battery SOC</div>
+                <div className="text-base font-black text-teal-400 font-mono mt-0.5">
+                  {Math.round(batterySoc)}%
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className={`p-3 rounded-xl ${isCream ? 'bg-white/80' : 'bg-white/[0.02]'}`}>
-            <div className="text-[10px] uppercase font-bold opacity-60">{t.duration}</div>
-            <div className={`text-lg font-black font-mono mt-0.5 ${isCream ? 'text-slate-900' : 'text-white'}`}>
-              {durationMinutes} <span className="text-xs opacity-60">min</span>
+            {/* 3. Strict Two-Charge Financial Breakdown */}
+            <div className={`p-4 rounded-2xl border space-y-2 text-xs ${
+              isCream ? 'bg-white border-amber-900/10' : 'bg-[#08101E] border-white/10'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={isCream ? 'text-slate-600' : 'text-slate-400'}>Reservation Fee:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-slate-400 line-through">50.00 ETB</span>
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px] border border-emerald-500/30">
+                    PAID ✓
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className={isCream ? 'text-slate-600' : 'text-slate-400'}>Energy Consumption Cost:</span>
+                <span className="font-mono font-bold">{costEtb.toFixed(2)} ETB</span>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-sm">
+                <span className="font-bold">Charging Payment Due:</span>
+                <span className="font-mono font-black text-emerald-400 text-base">
+                  {costEtb.toFixed(2)} ETB
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className={`p-3 rounded-xl ${isCream ? 'bg-white/80' : 'bg-white/[0.02]'}`}>
-            <div className="text-[10px] uppercase font-bold opacity-60">{t.finalSoc}</div>
-            <div className="text-lg font-black text-[#0D9488] dark:text-[#2DD4BF] font-mono mt-0.5">
-              {Math.round(batterySoc)}%
+            {/* 4. Payment Method Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wider font-bold opacity-70">
+                Select Payment Method
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['Telebirr', 'CBE Birr', 'Chapa', 'Wallet'] as const).map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setSelectedMethod(method)}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                      selectedMethod === method
+                        ? 'bg-teal-500/20 border-teal-400 text-teal-300 shadow-[0_0_12px_rgba(45,212,191,0.25)]'
+                        : isCream
+                        ? 'bg-white border-stone-200 text-slate-700 hover:bg-stone-50'
+                        : 'bg-slate-900/80 border-white/5 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>{method}</span>
+                    {selectedMethod === method && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Navigation CTAs */}
-        <div className="space-y-2.5">
-          {/* Primary CTA: Go to Step 08 History */}
-          <button
-            onClick={handleGoToHistory}
-            className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all hover:scale-[1.02] cursor-pointer"
-          >
-            <span>{t.proceedToHistory}</span>
-            <ArrowRight className="w-4 h-4 stroke-[3]" />
-          </button>
+            {errorMsg && (
+              <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
-          {/* Secondary CTA: Return to Cockpit */}
-          <button
-            onClick={handleGoToCockpit}
-            className={`w-full py-3 px-4 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer ${
-              isCream
-                ? 'bg-black/5 hover:bg-black/10 text-slate-700'
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white'
-            }`}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{t.returnToCockpit}</span>
-          </button>
-        </div>
+            {/* 5. Primary Action: Pay & Release Bay */}
+            <button
+              onClick={handlePayAndFinish}
+              disabled={isProcessing}
+              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all hover:scale-[1.01] cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>{isProcessing ? 'Processing Payment...' : `Pay & Finish (${costEtb.toFixed(2)} ETB)`}</span>
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Payment Completed & Bay Released State */}
+            <div className="text-center space-y-2 py-2 animate-in zoom-in-95">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#06b6d4] to-[#10b981] flex items-center justify-center mx-auto text-slate-950 shadow-[0_0_30px_rgba(45,212,191,0.6)]">
+                <CheckCircle2 className="w-9 h-9 stroke-[2.5]" />
+              </div>
+              <h3 className={`text-xl font-black tracking-tight ${isCream ? 'text-slate-900' : 'text-white'}`}>
+                Payment Complete — Bay Released
+              </h3>
+              <p className={`text-xs max-w-xs mx-auto leading-relaxed ${isCream ? 'text-slate-600' : 'text-slate-300'}`}>
+                {bayName} has been immediately released and is now available for the next driver.
+              </p>
+            </div>
+
+            {/* Receipt Card */}
+            <div className={`p-4 rounded-2xl border space-y-2 font-mono text-xs ${
+              isCream ? 'bg-white border-amber-900/10' : 'bg-[#060B14] border-white/10'
+            }`}>
+              <div className="flex justify-between">
+                <span className="opacity-60">Transaction ID:</span>
+                <span className="font-bold text-teal-400">{txId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-60">Energy Delivered:</span>
+                <span className="font-bold">{energyKwh.toFixed(1)} kWh</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-60">Total Paid:</span>
+                <span className="font-bold text-emerald-400">{costEtb.toFixed(2)} ETB</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-60">Payment Method:</span>
+                <span className="font-bold">{selectedMethod}</span>
+              </div>
+            </div>
+
+            {/* CTAs */}
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={handleGoToHistory}
+                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all hover:scale-[1.01] cursor-pointer"
+              >
+                <span>{t.proceedToHistory}</span>
+                <ArrowRight className="w-4 h-4 stroke-[3]" />
+              </button>
+
+              <button
+                onClick={handleGoToCockpit}
+                className={`w-full py-3 px-4 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+                  isCream
+                    ? 'bg-black/5 hover:bg-black/10 text-slate-700'
+                    : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white'
+                }`}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{t.returnToCockpit}</span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

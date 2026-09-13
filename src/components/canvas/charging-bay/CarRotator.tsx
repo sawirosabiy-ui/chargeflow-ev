@@ -23,9 +23,10 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
   const currentRotY = useRef(initialRotation);
   const velocity = useRef(0);
   const isDragging = useRef(false);
-  const lastX = useRef(0);
+  const lastClientX = useRef(0);
+  const activePointerId = useRef<number | null>(null);
 
-  // Sync target rotation from props if supplied (e.g. angle preset buttons)
+  // Sync target rotation from props (e.g. angle preset buttons) ONLY if not currently dragging
   useEffect(() => {
     if (targetRotation !== undefined && !isDragging.current) {
       currentRotY.current = targetRotation;
@@ -34,36 +35,55 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
   }, [targetRotation]);
 
   useEffect(() => {
+    // 1. Pointer Down: Immediately cancel all momentum, auto-rotation, and take direct finger control
     const handlePointerDown = (e: PointerEvent) => {
-      // Check if target is inside canvas
       const target = e.target as HTMLElement | null;
-      if (target && target.tagName.toLowerCase() === 'canvas') {
+      // Allow drag on canvas or on 3D container
+      if (target && (target.tagName.toLowerCase() === 'canvas' || target.closest('canvas'))) {
         isDragging.current = true;
-        lastX.current = e.clientX;
-        velocity.current = 0;
+        activePointerId.current = e.pointerId;
+        lastClientX.current = e.clientX;
+        velocity.current = 0; // Cancel any inertia instantly
       }
     };
 
+    // 2. Pointer Move: Immediately apply pointer delta to rotation. NO animation lock, NO delay.
+    // Instant response to dragging left, right, left, right in real time.
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDragging.current) return;
-      const deltaX = e.clientX - lastX.current;
-      lastX.current = e.clientX;
-      const rotDelta = deltaX * 0.008;
-      currentRotY.current += rotDelta;
-      velocity.current = rotDelta;
-      if (onRotationChange) {
-        onRotationChange(currentRotY.current);
+      if (activePointerId.current !== null && e.pointerId !== activePointerId.current) return;
+
+      const deltaX = e.clientX - lastClientX.current;
+      lastClientX.current = e.clientX;
+
+      if (deltaX !== 0) {
+        // Direct angular control: 1px = ~0.009 radians
+        const rotDelta = deltaX * 0.009;
+        currentRotY.current += rotDelta;
+        velocity.current = rotDelta; // Track instantaneous velocity for subtle release inertia
+
+        if (groupRef.current) {
+          groupRef.current.rotation.y = currentRotY.current;
+        }
+
+        if (onRotationChange) {
+          onRotationChange(currentRotY.current);
+        }
       }
     };
 
-    const handlePointerUp = () => {
-      isDragging.current = false;
+    // 3. Pointer Up & Cancel: Release drag and enter gentle decay inertia
+    const handlePointerUp = (e: PointerEvent) => {
+      if (activePointerId.current !== null && e.pointerId === activePointerId.current) {
+        isDragging.current = false;
+        activePointerId.current = null;
+      }
     };
 
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('pointerdown', handlePointerDown, { passive: true });
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerup', handlePointerUp, { passive: true });
+    window.addEventListener('pointercancel', handlePointerUp, { passive: true });
 
     return () => {
       window.removeEventListener('pointerdown', handlePointerDown);
@@ -73,16 +93,23 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
     };
   }, [onRotationChange]);
 
+  // Frame tick: Handles auto-rotate and short inertia decay ONLY when user is NOT touching the screen
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    if (autoRotate && !isDragging.current) {
+    if (isDragging.current) {
+      // While dragging, group rotation is strictly locked to currentRotY
+      groupRef.current.rotation.y = currentRotY.current;
+      return;
+    }
+
+    if (autoRotate) {
       currentRotY.current += autoRotateSpeed * delta;
       if (onRotationChange) onRotationChange(currentRotY.current);
-    } else if (!isDragging.current && Math.abs(velocity.current) > 0.0001) {
-      // Smooth physical momentum decay
+    } else if (Math.abs(velocity.current) > 0.0001) {
+      // Very short, physically responsive inertia that stops instantly on next touch
       currentRotY.current += velocity.current;
-      velocity.current *= 0.92;
+      velocity.current *= 0.88; // Quick decay so it never runs away
       if (onRotationChange) onRotationChange(currentRotY.current);
     }
 
@@ -95,3 +122,5 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
     </group>
   );
 };
+
+export default CarRotator;

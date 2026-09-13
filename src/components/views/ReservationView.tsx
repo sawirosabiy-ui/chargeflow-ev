@@ -800,10 +800,37 @@ export const ReservationView: React.FC = () => {
               </div>
             </div>
 
+            {/* Strict Two-Stage Pricing Disclosure */}
+            <div className="p-3 rounded-2xl bg-teal-500/10 border border-teal-500/20 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-teal-300">Stage 1: Reservation Fee</span>
+                <span className="font-mono font-black text-emerald-400">50.00 ETB</span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Mandatory 50 ETB paid now to confirm and lock your bay exclusively.
+              </p>
+              <div className="pt-1 border-t border-white/10 flex items-center justify-between text-[11px] font-semibold text-slate-300">
+                <span>Stage 2: Charging Cost</span>
+                <span className="font-mono text-teal-300">Billed After Charging</span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Calculated as kWh delivered × rate (19.50 ETB/kWh). Paid separately upon disconnect.
+              </p>
+            </div>
+
+            {reservationError && (
+              <div className="p-3 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs space-y-1 animate-in fade-in">
+                <div className="font-bold flex items-center gap-1.5">
+                  <span>⚠️ Reservation not completed</span>
+                </div>
+                <p className="text-[10px] opacity-90">{reservationError}</p>
+              </div>
+            )}
+
             {/* Real Wallet & Reservation Fee Row */}
             <div className="pt-3 border-t border-white/5 space-y-2.5">
               <div className="flex justify-between items-center text-xs">
-                <span className={`font-semibold ${isCream ? "text-stone-600" : "text-slate-400"}`}>Reservation Deposit</span>
+                <span className={`font-semibold ${isCream ? "text-stone-600" : "text-slate-400"}`}>Reservation Fee (Required)</span>
                 <span className="font-mono font-black text-emerald-400">50.00 ETB</span>
               </div>
 
@@ -948,8 +975,9 @@ export const ReservationView: React.FC = () => {
               onClick={() => {
                 setShowPinModal(false);
                 setPin('');
+                setReservationError('Reservation not completed. Payment was cancelled.');
               }}
-              className="w-full py-2 text-xs text-slate-400 hover:text-white text-center transition-colors"
+              className="w-full py-2 text-xs text-slate-400 hover:text-white text-center transition-colors cursor-pointer"
             >
               {t.cancel}
             </button>

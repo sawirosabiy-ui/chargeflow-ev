@@ -68,7 +68,17 @@ export interface DbReservation {
   depositEtb: number;
   slotTime: string;
   date: string;
-  status: 'RESERVED' | 'QUEUED' | 'READY_TO_CHARGE' | 'CHARGING' | 'COMPLETED' | 'CANCELLED';
+  status:
+    | 'AVAILABLE'
+    | 'RESERVATION_PENDING'
+    | 'RESERVED'
+    | 'QUEUED'
+    | 'NEXT_IN_QUEUE'
+    | 'READY_TO_CHARGE'
+    | 'CHARGING'
+    | 'PAYMENT_PENDING'
+    | 'COMPLETED'
+    | 'CANCELLED';
   queuePosition?: number;
   arrivalDeadlineMin: number;
   pinConfirmed: boolean;
@@ -457,6 +467,83 @@ export const cancelUserReservation = (userId: string): void => {
   try {
     localStorage.setItem(DB_RESERVATIONS_KEY, JSON.stringify(resMap));
   } catch {}
+};
+
+/**
+ * Check if a charger bay is currently occupied or held under active reservation
+ * Prevents double-booking across all users.
+ */
+export const isBayOccupiedOrReserved = (stationId: string, bayId: string, currentUserId?: string): boolean => {
+  const resMap = getReservationsMap();
+  for (const [uid, res] of Object.entries(resMap)) {
+    if (res && res.stationId === stationId && res.bayId === bayId) {
+      if (currentUserId && uid === currentUserId) continue;
+      if (
+        res.status === 'RESERVED' ||
+        res.status === 'CHARGING' ||
+        res.status === 'READY_TO_CHARGE' ||
+        res.status === 'PAYMENT_PENDING' ||
+        res.status === 'NEXT_IN_QUEUE'
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+/**
+ * Count how many users are currently queued for this bay
+ */
+export const getBayQueueCount = (stationId: string, bayId: string): number => {
+  const resMap = getReservationsMap();
+  let count = 0;
+  for (const [, res] of Object.entries(resMap)) {
+    if (res && res.stationId === stationId && res.bayId === bayId) {
+      if (res.status === 'QUEUED' || res.status === 'NEXT_IN_QUEUE') {
+        count++;
+      }
+    }
+  }
+  return count;
+};
+
+/**
+ * When an active session finishes & releases the bay, advance the first queued user to NEXT_IN_QUEUE
+ */
+export const promoteNextInQueue = (stationId: string, bayId: string): DbReservation | null => {
+  const resMap = getReservationsMap();
+  const queuedUsers: { userId: string; res: DbReservation }[] = [];
+
+  for (const [uid, res] of Object.entries(resMap)) {
+    if (res && res.stationId === stationId && res.bayId === bayId && res.status === 'QUEUED') {
+      queuedUsers.push({ userId: uid, res });
+    }
+  }
+
+  if (queuedUsers.length === 0) return null;
+
+  // Sort by earliest reservation timestamp (FIFO Queue)
+  queuedUsers.sort((a, b) => a.res.createdAt - b.res.createdAt);
+
+  const nextUser = queuedUsers[0];
+  nextUser.res.status = 'NEXT_IN_QUEUE';
+  nextUser.res.queuePosition = 1;
+  nextUser.res.arrivalDeadlineMin = 15;
+  resMap[nextUser.userId] = nextUser.res;
+
+  // Update subsequent queued positions
+  for (let i = 1; i < queuedUsers.length; i++) {
+    const q = queuedUsers[i];
+    q.res.queuePosition = i + 1;
+    resMap[q.userId] = q.res;
+  }
+
+  try {
+    localStorage.setItem(DB_RESERVATIONS_KEY, JSON.stringify(resMap));
+  } catch {}
+
+  return nextUser.res;
 };
 
 // ---------------------------------------------------------------------------
