@@ -254,7 +254,8 @@ export const ReservationView: React.FC = () => {
               onClick={() => setView('charging')}
               className="flex-1 md:flex-initial py-2.5 px-4 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
             >
-              <span>CHARGING COCKPIT</span>
+              <Zap className="w-3.5 h-3.5 fill-slate-950" />
+              <span>GO TO LIVE SESSION</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

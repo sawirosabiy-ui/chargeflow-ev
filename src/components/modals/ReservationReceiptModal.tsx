@@ -33,9 +33,9 @@ export const ReservationReceiptModal: React.FC = () => {
     status,
   } = receiptModal;
 
-  const handleViewReservation = () => {
+  const handleGoToLiveSession = () => {
     closeReceiptModal();
-    setView('cockpit');
+    setView('charging');
   };
 
   const handleGetDirections = () => {
@@ -190,10 +190,11 @@ export const ReservationReceiptModal: React.FC = () => {
         {/* Action Buttons */}
         <div className="space-y-2 pt-1">
           <button
-            onClick={handleViewReservation}
+            onClick={handleGoToLiveSession}
             className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
           >
-            <span>VIEW RESERVATION</span>
+            <Zap className="w-4 h-4 fill-slate-950" />
+            <span>GO TO LIVE SESSION</span>
             <ArrowRight className="w-4 h-4 stroke-[3]" />
           </button>
 
