@@ -132,7 +132,7 @@ export const AheCameraControls: React.FC<AheCameraControlsProps> = ({
       </div>
 
       {/* 2. COMPACT VERTICAL 3D DOCKED TOOL PILL (For screens < xl: tablets, phones, narrow viewports) */}
-      <div className={`absolute right-3 sm:right-6 bottom-20 sm:bottom-24 z-20 pointer-events-auto select-none flex xl:hidden flex-col items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl transition-all shadow-xl ${
+      <div className={`absolute right-3 sm:right-6 bottom-24 sm:bottom-28 z-20 pointer-events-auto select-none flex xl:hidden flex-col items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl transition-all shadow-xl ${
         isCream
           ? 'bg-[#FAF7F2]/90 border-amber-900/15 text-slate-800'
           : 'bg-[#08101E]/85 border-teal-500/30 text-slate-300'

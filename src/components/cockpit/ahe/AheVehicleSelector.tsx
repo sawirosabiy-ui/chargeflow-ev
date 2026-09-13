@@ -50,7 +50,7 @@ export const AheVehicleSelector: React.FC<AheVehicleSelectorProps> = ({
   const hubTitle = reservation?.stationName ? reservation.stationName.split('(')[0].trim() : t.stationHub;
 
   return (
-    <div className="absolute bottom-3 sm:bottom-8 left-3 sm:left-8 z-20 pointer-events-auto select-none flex flex-col gap-2 sm:gap-3 max-w-[calc(100vw-120px)] sm:max-w-[260px] md:max-w-[300px]">
+    <div className="absolute bottom-6 sm:bottom-10 left-3 sm:left-8 z-20 pointer-events-auto select-none flex flex-col gap-2 sm:gap-3 max-w-[calc(100vw-130px)] sm:max-w-[270px] md:max-w-[320px]">
       {/* 1. Car Switcher Pill */}
       <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl border backdrop-blur-2xl transition-all duration-300 group ${
         isCream
@@ -82,9 +82,9 @@ export const AheVehicleSelector: React.FC<AheVehicleSelectorProps> = ({
           />
         </div>
 
-        {/* Vehicle Name & Type */}
-        <div className="px-1 text-left min-w-0 flex-1">
-          <div className={`text-[10px] sm:text-xs font-black uppercase font-sans tracking-tight sm:tracking-wide leading-tight truncate ${
+        {/* Vehicle Name & Type with generous breathing room */}
+        <div className="px-2 text-left min-w-0 flex-1">
+          <div className={`text-[11px] sm:text-xs font-black uppercase font-sans tracking-wider leading-tight truncate ${
             isCream ? 'text-slate-900' : 'text-white'
           }`}>
             {vehicle.model || 'BYD ATTO 3'}
@@ -94,11 +94,13 @@ export const AheVehicleSelector: React.FC<AheVehicleSelectorProps> = ({
           </div>
         </div>
 
-        {/* Next Car Button */}
+        {/* Next Car Button with margin separation */}
         <button
           onClick={handleNext}
-          className={`p-0.5 sm:p-1 rounded-xl transition-colors cursor-pointer shrink-0 ${
-            isCream ? 'hover:bg-black/5 text-slate-500 hover:text-slate-900' : 'hover:bg-white/10 text-slate-400 hover:text-white'
+          className={`ml-1 p-1 sm:p-1.5 rounded-xl transition-all cursor-pointer shrink-0 border ${
+            isCream 
+              ? 'border-black/5 hover:bg-black/5 text-slate-600 hover:text-slate-950' 
+              : 'border-white/5 hover:bg-white/10 text-slate-300 hover:text-white'
           }`}
           title={t.nextVehicle}
         >

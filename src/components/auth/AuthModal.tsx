@@ -446,16 +446,28 @@ export const AuthModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Battery Level Slider */}
-            <div className="space-y-1 pt-1">
+            {/* Battery Level Selector with Quick Buttons & Circular Badge */}
+            <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between text-xs">
                 <span className={`font-bold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
                   Current Battery SoC
                 </span>
-                <span className="font-mono font-bold text-xs" style={{ color: batteryVisual.color }}>
-                  {batterySoc}% ({t[batteryVisual.labelKey]})
-                </span>
+                {/* Rounded / Circular Battery Badge */}
+                <div 
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border shadow-sm transition-all"
+                  style={{ 
+                    borderColor: batteryVisual.color, 
+                    backgroundColor: `${batteryVisual.color}15` 
+                  }}
+                >
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: batteryVisual.color }} />
+                  <span className="font-mono font-bold text-xs" style={{ color: batteryVisual.color }}>
+                    {batterySoc}% ({t[batteryVisual.labelKey]})
+                  </span>
+                </div>
               </div>
+
+              {/* Slider */}
               <input
                 type="range"
                 min={10}
@@ -464,6 +476,26 @@ export const AuthModal: React.FC = () => {
                 onChange={(e) => setBatterySoc(parseInt(e.target.value))}
                 className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-400"
               />
+
+              {/* Quick Preset Buttons (Circular / Rounded pills) */}
+              <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                {[20, 40, 60, 80, 95].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setBatterySoc(pct)}
+                    className={`flex-1 py-1 rounded-full text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                      batterySoc === pct
+                        ? "bg-teal-500/20 border-teal-400 text-teal-300 shadow-sm"
+                        : isCream
+                          ? "bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-600"
+                          : "bg-white/5 hover:bg-white/10 border-white/5 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Submit Create Account CTA */}

@@ -19,7 +19,7 @@ export const AheActionButtons: React.FC<AheActionButtonsProps> = ({
   const isCream = theme === 'cream';
 
   return (
-    <div className="absolute bottom-3 sm:bottom-8 right-3 sm:right-8 z-20 pointer-events-auto select-none flex items-center">
+    <div className="absolute bottom-6 sm:bottom-10 right-3 sm:right-8 z-20 pointer-events-auto select-none flex items-center">
       {/* If Charging: Show Stop Button */}
       {isCharging ? (
         <button

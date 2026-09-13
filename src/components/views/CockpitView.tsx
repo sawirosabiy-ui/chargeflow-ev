@@ -37,13 +37,23 @@ export const CockpitView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* Left 8 Columns: Greeting + Open Cinematic 3D Vehicle Stage */}
         <div className="lg:col-span-8 flex flex-col justify-between space-y-3">
-          {/* Greeting Header */}
+          {/* Greeting Header (Calculated by local time of day) */}
           <div className="space-y-0.5">
-            <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-none drop-shadow-sm ${
-              isCream ? "text-stone-900" : "text-white"
-            }`}>
-              {t.goodEvening}, {user.name ? user.name.split(" ")[0] : "Driver"}
-            </h1>
+            {(() => {
+              const currentHour = new Date().getHours();
+              const timeGreeting = currentHour < 12 
+                ? t.goodMorning 
+                : currentHour < 18 
+                ? t.goodAfternoon 
+                : t.goodEvening;
+              return (
+                <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-none drop-shadow-sm ${
+                  isCream ? "text-stone-900" : "text-white"
+                }`}>
+                  {timeGreeting}, {user.name ? user.name.split(" ")[0] : "Driver"}
+                </h1>
+              );
+            })()}
             <p className={`text-xs sm:text-sm font-medium ${
               isCream ? "text-stone-600" : "text-slate-400"
             }`}>

@@ -63,9 +63,9 @@ export const AICopilotModal: React.FC = () => {
     if (lang === 'አማ') {
       const resText = reservation ? ` • ንቁ ቦታ ማስያዣ፦ ${reservation.stationName} (${reservation.bayNumber})` : '';
       return {
-        id: `welcome-${lang}`,
+        id: `welcome-${lang}-${Date.now()}`,
         sender: 'copilot',
-        text: `ሰላም **${userName}**! እኔ የቻርጅፍሎው AI ረዳት ነኝ። ከተሽከርካሪዎ **${vehicle.model}** ጋር ተገናኝቻለሁ (**${vehicle.batterySoc}% ባትሪ**፣ ~${range} ኪ.ሜ)። የዋሌት ቀሪ ሂሳብ፦ **${balance} ብር**${resText}። ዛሬ አዲስ አበባ ውስጥ በምን ልርዳዎ?`,
+        text: `ሰላም ${userName}! እኔ የቻርጅፍሎው AI ረዳት ነኝ። ከተሽከርካሪዎ ${vehicle.model} ጋር ተገናኝቻለሁ (${vehicle.batterySoc}% ባትሪ፣ ~${range} ኪ.ሜ)። የዋሌት ቀሪ ሂሳብ፦ ${balance} ብር${resText}። ዛሬ አዲስ አበባ ውስጥ በምን ልርዳዎ?`,
         timestamp: 'አሁን',
         actions: [
           { label: '📍 በአዲስ አበባ ያሉ ቻርጀሮች', actionType: 'navigate_stations' },
@@ -78,9 +78,9 @@ export const AICopilotModal: React.FC = () => {
     if (lang === 'ORM') {
       const resText = reservation ? ` • Qabannoo: ${reservation.stationName} (${reservation.bayNumber})` : '';
       return {
-        id: `welcome-${lang}`,
+        id: `welcome-${lang}-${Date.now()}`,
         sender: 'copilot',
-        text: `Akkam **${userName}**! Ani gargaaraa ChargeFlow AI ti. Konkolaataa keessan **${vehicle.model}** wajjin wal qabateera (**Baatrii ${vehicle.batterySoc}%**፣ tilmaamaan ~${range} km)። Boorsaa: **${balance} ETB**${resText}። Har'a Finfinnee keessatti akkamitti isin gargaaruu danda'a?`,
+        text: `Akkam ${userName}! Ani gargaaraa ChargeFlow AI ti. Konkolaataa keessan ${vehicle.model} wajjin wal qabateera (Baatrii ${vehicle.batterySoc}%, tilmaamaan ~${range} km)። Boorsaa: ${balance} ETB${resText}። Har'a Finfinnee keessatti akkamitti isin gargaaruu danda'a?`,
         timestamp: 'Amma',
         actions: [
           { label: '📍 Wiirtuuwwan Finfinnee', actionType: 'navigate_stations' },
@@ -93,9 +93,9 @@ export const AICopilotModal: React.FC = () => {
     if (lang === 'TIR') {
       const resText = reservation ? ` • ዝተታሕዘ፦ ${reservation.stationName} (${reservation.bayNumber})` : '';
       return {
-        id: `welcome-${lang}`,
+        id: `welcome-${lang}-${Date.now()}`,
         sender: 'copilot',
-        text: `ሰላም **${userName}**! ኣነ ናይ ChargeFlow AI ረዳኢ እየ። ምስ ተሽከርካሪኹም **${vehicle.model}** ተተሓሒዘ ኣለኹ (**${vehicle.batterySoc}% ባትሪ**፣ ~${range} ኪ.ሜ)። ናይ ቦርሳ ሚዛን፦ **${balance} ቅርሺ**${resText}። ሎሚ ኣብ ኣዲስ ኣበባ ብምንታይ ክሕግዘኩም?`,
+        text: `ሰላም ${userName}! ኣነ ናይ ChargeFlow AI ረዳኢ እየ። ምስ ተሽከርካሪኹም ${vehicle.model} ተተሓሒዘ ኣለኹ (${vehicle.batterySoc}% ባትሪ፣ ~${range} ኪ.ሜ)። ናይ ቦርሳ ሚዛን፦ ${balance} ቅርሺ${resText}። ሎሚ ኣብ ኣዲስ ኣበባ ብምንታይ ክሕግዘኩም?`,
         timestamp: 'ሕጂ',
         actions: [
           { label: '📍 ኣብ ኣዲስ ኣበባ ዘለዉ ቻርጀራት', actionType: 'navigate_stations' },
@@ -108,9 +108,9 @@ export const AICopilotModal: React.FC = () => {
     // Default English
     const resText = reservation ? ` • Active Reservation: ${reservation.stationName} (${reservation.bayNumber})` : '';
     return {
-      id: `welcome-${lang}`,
+      id: `welcome-${lang}-${Date.now()}`,
       sender: 'copilot',
-      text: `Hello **${userName}**! I'm your ChargeFlow AI Copilot. Connected to your **${vehicle.model}** with **${vehicle.batterySoc}% SoC** (~${range} km estimated range). Wallet Balance: **${balance} ETB**${resText}. How can I assist your EV journey in Addis Ababa today?`,
+      text: `Hello ${userName}! I'm your ChargeFlow AI Copilot. Connected to your ${vehicle.model} with ${vehicle.batterySoc}% SoC (~${range} km estimated range). Wallet Balance: ${balance} ETB${resText}. How can I assist your EV journey in Addis Ababa today?`,
       timestamp: 'Just now',
       actions: [
         { label: '📍 Live Stations in Addis', actionType: 'navigate_stations' },
@@ -128,12 +128,8 @@ export const AICopilotModal: React.FC = () => {
 
   // Reload conversation when user or language changes
   useEffect(() => {
-    const saved = getUserCopilotMessages(user.id || 'guest');
-    if (saved && saved.length > 0) {
-      setMessages(saved);
-    } else {
-      setMessages([getInitialWelcomeMessage(language)]);
-    }
+    // Refresh welcome message in the newly selected language
+    setMessages([getInitialWelcomeMessage(language)]);
   }, [user.id, language]);
 
   // Persist conversation per user

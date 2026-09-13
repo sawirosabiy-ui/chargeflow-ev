@@ -13,6 +13,8 @@ export interface TranslationStrings {
 
   // Cockpit View
   goodEvening: string;
+  goodMorning: string;
+  goodAfternoon: string;
   connectedAndReady: string;
   batteryStatus: string;
   estimatedRange: string;
@@ -270,6 +272,8 @@ export const translations: Record<Language, TranslationStrings> = {
     welcome: "Welcome",
 
     goodEvening: "Good evening",
+    goodMorning: "Good morning",
+    goodAfternoon: "Good afternoon",
     connectedAndReady: "Your EV, connected and ready.",
     batteryStatus: "Battery Status",
     estimatedRange: "Estimated Range",
@@ -516,7 +520,9 @@ export const translations: Record<Language, TranslationStrings> = {
     settings: "ማስተካከያዎች",
     welcome: "እንኳን ደህና መጡ",
 
-    goodEvening: "እንደምን አደሩ",
+    goodEvening: "እንደይት አመሹ",
+    goodMorning: "እንደይት አደሩ",
+    goodAfternoon: "እንደይት ዋሉ",
     connectedAndReady: "የእርስዎ ኤሌክትሪክ መኪና ዝግጁ ነው።",
     batteryStatus: "የባትሪ ሁኔታ",
     estimatedRange: "የሚጓዘው ርቀት",
@@ -763,7 +769,9 @@ export const translations: Record<Language, TranslationStrings> = {
     settings: "Sajoo",
     welcome: "Baga Dhuftan",
 
-    goodEvening: "Akkam bultani",
+    goodEvening: "Akkam ooltan",
+    goodMorning: "Akkam bultan",
+    goodAfternoon: "Akkam ooltan",
     connectedAndReady: "Konkolaataan keessan qophiidha.",
     batteryStatus: "Haala Baatrii",
     estimatedRange: "Fageenya Tilmaamaa",
@@ -1012,6 +1020,8 @@ export const translations: Record<Language, TranslationStrings> = {
     welcome: "እንቋዕ ብደሓን መጻእኩም",
 
     goodEvening: "ከመይ ኣምሲኹም",
+    goodMorning: "ከመይ ሓዲርኩም",
+    goodAfternoon: "ከመይ ውዒልኩም",
     connectedAndReady: "መኪናኹም ቕሩብ ኣላ።",
     batteryStatus: "ኩነታት ባትሪ",
     estimatedRange: "ዝጓዓዞ ርሕቐት",
