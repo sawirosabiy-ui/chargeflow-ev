@@ -84,9 +84,14 @@ const BayDispenserVisual: React.FC<BayDispenserVisualProps> = ({ status, power =
 export const ReservationView: React.FC = () => {
   const user = useChargeFlowStore((s) => s.user);
   const vehicle = useChargeFlowStore((s) => s.vehicle);
+  const wallet = useChargeFlowStore((s) => s.wallet);
   const setView = useChargeFlowStore((s) => s.setView);
   const confirmReservation = useChargeFlowStore((s) => s.confirmReservation);
+  const topupWalletBalance = useChargeFlowStore((s) => s.topupWalletBalance);
+  const openAuthModal = useChargeFlowStore((s) => s.openAuthModal);
   const theme = useChargeFlowStore((s) => s.theme);
+  const [reservationError, setReservationError] = useState('');
+  const [showTopupModal, setShowTopupModal] = useState(false);
   const { t, language } = useTranslation();
   const isCream = theme === 'cream';
 
@@ -125,10 +130,30 @@ export const ReservationView: React.FC = () => {
       if (nextPin.length === 4) {
         const bayId = selectedBay.toLowerCase().replace(/\s+/g, '-');
         setTimeout(() => {
-          confirmReservation('addis-ev-hub-bole', bayId);
+          const res = confirmReservation('addis-ev-hub-bole', bayId, selectedTimeSlot, selectedDate);
+          if (res.success) {
+            setShowPinModal(false);
+            setPin('');
+            setReservationError('');
+          } else {
+            setReservationError(res.error || 'Failed to complete reservation');
+          }
         }, 300);
       }
     }
+  };
+
+  const handleConfirmReservationClick = () => {
+    if (!user.isAuthenticated) {
+      openAuthModal('signup');
+      return;
+    }
+    if (wallet.balanceEtb < 50) {
+      setShowTopupModal(true);
+      return;
+    }
+    setReservationError('');
+    setShowPinModal(true);
   };
 
   const handleDeletePin = () => {
@@ -648,7 +673,7 @@ export const ReservationView: React.FC = () => {
             </div>
 
             <button
-              onClick={() => setShowPinModal(true)}
+              onClick={handleConfirmReservationClick}
               className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(20,184,166,0.4)] transition-all hover:scale-[1.02] shrink-0"
             >
               <span>{t.confirmReservationBtn}</span>
@@ -775,19 +800,97 @@ export const ReservationView: React.FC = () => {
               </div>
             </div>
 
-            {/* Total Row */}
-            <div className="pt-2 border-t border-white/5 space-y-1">
-              <div className="flex justify-between items-baseline">
-                <span className={`text-xs font-bold ${isCream ? "text-stone-700" : "text-slate-300"}`}>{t.totalBilled}</span>
-                <span className="text-xl font-black font-mono text-emerald-400">ETB 0</span>
+            {/* Real Wallet & Reservation Fee Row */}
+            <div className="pt-3 border-t border-white/5 space-y-2.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className={`font-semibold ${isCream ? "text-stone-600" : "text-slate-400"}`}>Reservation Deposit</span>
+                <span className="font-mono font-black text-emerald-400">50.00 ETB</span>
               </div>
-              <p className="text-[10px] text-slate-400">
-                No payment now. You'll pay during charging.
-              </p>
+
+              <div className="flex justify-between items-center text-xs">
+                <span className={`font-semibold ${isCream ? "text-stone-600" : "text-slate-400"}`}>Current Wallet</span>
+                <span className={`font-mono font-bold ${wallet.balanceEtb < 50 ? "text-rose-400" : isCream ? "text-stone-900" : "text-white"}`}>
+                  {wallet.balanceEtb.toFixed(2)} ETB
+                </span>
+              </div>
+
+              {wallet.balanceEtb < 50 ? (
+                <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <span>⚠️ Insufficient Wallet Balance</span>
+                  </div>
+                  <p className="text-[10px] opacity-90">
+                    A minimum of 50 ETB is required to hold your charging bay.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowTopupModal(true)}
+                    className="w-full py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Top Up Wallet (+500 ETB)
+                  </button>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
+                  <span className={`font-semibold ${isCream ? "text-stone-600" : "text-slate-400"}`}>Balance After Deposit</span>
+                  <span className="font-mono font-bold text-teal-300">
+                    {(wallet.balanceEtb - 50).toFixed(2)} ETB
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Topup Modal */}
+      {showTopupModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-[#111827] border border-emerald-500/30 rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 shadow-2xl">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">Top Up ChargeFlow Wallet</h3>
+              <p className="text-xs text-slate-400">
+                Instant reload via Ethiopian Payment Gateways
+              </p>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-between">
+              <span className="text-xs text-slate-400">Current Balance:</span>
+              <span className="text-sm font-mono font-bold text-white">{wallet.balanceEtb.toFixed(2)} ETB</span>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">Select Amount</span>
+              <div className="grid grid-cols-3 gap-2">
+                {[200, 500, 1000].map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => {
+                      topupWalletBalance(amt, 'Telebirr');
+                      setShowTopupModal(false);
+                    }}
+                    className="py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-mono font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                  >
+                    +{amt} ETB
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setShowTopupModal(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4-Digit PIN Security Modal */}
       {showPinModal && (
@@ -803,6 +906,11 @@ export const ReservationView: React.FC = () => {
               </p>
             </div>
 
+            {reservationError && (
+              <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs text-center font-semibold">
+                {reservationError}
+              </div>
+            )}
             {/* 4-Digit Masked Display */}
             <div className="flex justify-center gap-3 py-2">
               {[0, 1, 2, 3].map((i) => (

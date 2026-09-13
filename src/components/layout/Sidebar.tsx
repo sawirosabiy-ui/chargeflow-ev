@@ -27,6 +27,7 @@ export const Sidebar: React.FC = () => {
   const setView = useChargeFlowStore((s) => s.setView);
   const user = useChargeFlowStore((s) => s.user);
   const vehicle = useChargeFlowStore((s) => s.vehicle);
+  const requireAuth = useChargeFlowStore((s) => s.requireAuth);
   const isSidebarOpen = useChargeFlowStore((s) => s.isSidebarOpen);
   const toggleSidebar = useChargeFlowStore((s) => s.toggleSidebar);
   const toggleCopilot = useChargeFlowStore((s) => s.toggleCopilot);
@@ -55,6 +56,18 @@ export const Sidebar: React.FC = () => {
   ];
 
   const handleNavClick = (viewId: AppView) => {
+    // Protected views require authentication
+    const protectedViews: AppView[] = ["reservation", "queue", "charging", "history", "settings"];
+    if (protectedViews.includes(viewId)) {
+      const allowed = requireAuth({ view: viewId });
+      if (!allowed) {
+        if (typeof window !== "undefined" && window.innerWidth < 1024) {
+          useChargeFlowStore.setState({ isSidebarOpen: false });
+        }
+        return;
+      }
+    }
+
     setView(viewId);
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       useChargeFlowStore.setState({ isSidebarOpen: false });

@@ -42,7 +42,7 @@ export const CockpitView: React.FC = () => {
             <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-none drop-shadow-sm ${
               isCream ? "text-stone-900" : "text-white"
             }`}>
-              {t.goodEvening}, {user.name ? user.name.split(" ")[0] : "Samuel"}
+              {t.goodEvening}, {user.name ? user.name.split(" ")[0] : "Driver"}
             </h1>
             <p className={`text-xs sm:text-sm font-medium ${
               isCream ? "text-stone-600" : "text-slate-400"
@@ -203,7 +203,16 @@ export const CockpitView: React.FC = () => {
             <div className="grid grid-cols-4 gap-2">
               {/* 1. Start Charging */}
               <button
-                onClick={() => setView("charging")}
+                onClick={() => {
+                  const reservation = useChargeFlowStore.getState().reservation;
+                  if (!reservation) {
+                    setView("find_charge");
+                  } else if (reservation.status === "QUEUED") {
+                    setView("queue");
+                  } else {
+                    setView("charging");
+                  }
+                }}
                 className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-emerald-500/10 transition-all group text-center"
               >
                 <div className="w-10 h-10 rounded-full border border-teal-500/40 bg-teal-500/15 flex items-center justify-center text-teal-400 shadow-[0_0_15px_rgba(45,212,191,0.25)] group-hover:scale-110 transition-all">

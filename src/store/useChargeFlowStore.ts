@@ -3,6 +3,20 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { AppView, Language, EVStation, ChargingHistoryRecord } from '../types';
 import { MOCK_EV_STATIONS } from '../data/mockStations';
 import { AVAILABLE_CARS, CarSpec } from '../data/cars';
+import {
+  DbUser,
+  DbTransaction,
+  DbReservation,
+  getUserWallet,
+  deductWalletFee,
+  topupWallet,
+  saveUserReservation,
+  updateReservationStatus,
+  cancelUserReservation,
+  getUserActiveReservation,
+  getUserHistory,
+  recordUserCompletedSession,
+} from '../data/db';
 
 export interface PaymentMethodItem {
   id: string;
@@ -28,9 +42,15 @@ export interface ChargeFlowState {
   } | null;
   isAuthModalOpen: boolean;
   authModalMode: 'signin' | 'signup';
-  
-  // User & Vehicle
+  pendingIntent: {
+    view?: AppView;
+    action?: string;
+    payload?: any;
+  } | null;
+
+  // User & Vehicle (Defaults to Unauthenticated Guest)
   user: {
+    id: string;
     name: string;
     email: string;
     phone: string;
@@ -55,7 +75,13 @@ export interface ChargeFlowState {
     isPreconditioned: boolean;
     image2D?: string;
   };
-  
+
+  // User Wallet & Ledger
+  wallet: {
+    balanceEtb: number;
+    transactions: DbTransaction[];
+  };
+
   // Notification Preferences
   notifications: {
     reservationReminders: boolean;
@@ -72,9 +98,16 @@ export interface ChargeFlowState {
   selectedStationId: string | null;
   selectedBayId: string | null;
   reservation: {
+    id?: string;
+    stationId?: string;
     stationName: string;
+    bayId?: string;
     bayNumber: string;
     depositEtb: number;
+    slotTime?: string;
+    date?: string;
+    status: 'RESERVED' | 'QUEUED' | 'READY_TO_CHARGE' | 'CHARGING' | 'COMPLETED' | 'CANCELLED';
+    queuePosition?: number;
     arrivalDeadlineMin: number;
     pinConfirmed: boolean;
   } | null;
@@ -106,7 +139,7 @@ export interface ChargeFlowState {
     selectedSubsystem: 'battery' | 'motor' | 'inverter' | 'thermal' | null;
   };
 
-  // Station Data & History Ledger
+  // Station Data & History Ledger (Isolated per User)
   stations: EVStation[];
   history: ChargingHistoryRecord[];
 
@@ -121,6 +154,10 @@ export interface ChargeFlowState {
   dismissCompletionNotification: () => void;
   openAuthModal: (mode?: 'signin' | 'signup') => void;
   closeAuthModal: () => void;
+  setPendingIntent: (intent: { view?: AppView; action?: string; payload?: any } | null) => void;
+  requireAuth: (intent?: { view?: AppView; action?: string; payload?: any }) => boolean;
+  loginUser: (user: DbUser) => void;
+  loadUserData: (userId: string) => void;
   updateUserProfile: (profile: Partial<{ name: string; email: string; phone: string; avatarUrl: string }>) => void;
   selectCar: (car: CarSpec) => void;
   updateUserBatterySoc: (soc: number) => void;
@@ -129,8 +166,15 @@ export interface ChargeFlowState {
   addPaymentMethod: (method: Omit<PaymentMethodItem, 'id'>) => void;
   removePaymentMethod: (id: string) => void;
   toggleTwoFactor: () => void;
-  confirmReservation: (stationId: string, bayId: string) => void;
-  startChargingSession: () => void;
+  
+  // Wallet Actions
+  topupWalletBalance: (amount: number, method?: string) => void;
+
+  // Reservation & Charging State Machine
+  confirmReservation: (stationId: string, bayId: string, slotTime?: string, date?: string) => { success: boolean; error?: string };
+  setReadyToCharge: () => void;
+  cancelActiveReservation: () => void;
+  startChargingSession: () => boolean;
   pauseChargingSession: () => void;
   resumeChargingSession: () => void;
   stopChargingSession: () => void;
@@ -164,29 +208,33 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
   persist(
     (set, get) => ({
       // Navigation & Shell
-      currentView: 'cockpit',
+      currentView: 'welcome',
       isSidebarOpen: typeof window !== 'undefined' ? window.innerWidth >= 1024 : true,
       isCopilotOpen: false,
-      language: 'ORM',
+      language: 'EN',
       theme: 'dark',
       completionNotification: null,
       isAuthModalOpen: false,
       authModalMode: 'signup',
+      pendingIntent: null,
 
-      // User & Vehicle
+      // Initial Guest User State (No fake hardcoded user)
       user: {
-        name: 'Abiy Tesfaye',
-        email: 'abiy.tesfaye@gmail.com',
-        phone: '+251 91 234 5678',
-        isAuthenticated: true,
-        twoFactorEnabled: true,
+        id: '',
+        name: '',
+        email: '',
+        phone: '',
+        isAuthenticated: false,
+        twoFactorEnabled: false,
       },
+
+      // Vehicle (Default showroom vehicle)
       vehicle: {
         id: AVAILABLE_CARS[0].id,
         model: AVAILABLE_CARS[0].name,
         brand: AVAILABLE_CARS[0].brand,
         plate: 'ET-3-A49281',
-        batterySoc: 100,
+        batterySoc: 38,
         capacityKwh: AVAILABLE_CARS[0].capacityKwh,
         maxRangeKm: AVAILABLE_CARS[0].rangeKm,
         drive: AVAILABLE_CARS[0].drive,
@@ -196,6 +244,12 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         paintColor: '#CBD5E1',
         isLocked: true,
         isPreconditioned: false,
+      },
+
+      // User-specific Wallet (Empty until account creation / sign-in)
+      wallet: {
+        balanceEtb: 0,
+        transactions: [],
       },
 
       // Notification Defaults
@@ -235,90 +289,41 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         },
       ],
 
-      // Active Station & Reservation
-      selectedStationId: 'addis-ev-hub-bole',
-      selectedBayId: 'bay-03',
-      reservation: {
-        stationName: 'Addis EV Hub (Bole Medhanialem)',
-        bayNumber: 'Bay 03',
-        depositEtb: 30.00,
-        arrivalDeadlineMin: 15,
-        pinConfirmed: true,
-      },
+      // Active Station & Reservation (Clean state: No fake active reservation)
+      selectedStationId: null,
+      selectedBayId: null,
+      reservation: null,
 
-      // Charging Session Engine
+      // Charging Session Engine (Clean state: No fake active charging session)
       chargingSession: {
-        status: 'CHARGING',
-        powerKw: 86,
-        energyDeliveredKwh: 32.4,
-        totalCostEtb: 631.80,
+        status: 'IDLE',
+        powerKw: 0,
+        energyDeliveredKwh: 0,
+        totalCostEtb: 0,
         ratePerKwh: 19.50,
         targetSoc: 90,
-        elapsedSeconds: 720,
+        elapsedSeconds: 0,
       },
 
-      // Cinematic Single Cockpit State
+      // Cinematic Single Cockpit State (Clean state)
       cockpitCharging: {
-        status: 'complete',
-        battery: 100,
-        targetBattery: 100,
+        status: 'idle',
+        battery: 38,
+        targetBattery: 90,
         chargingPower: 0,
         estimatedMinutes: 0,
-        rangeAddedKm: 310,
-        energyDeliveredKwh: 42.8,
-        batteryTempC: 31,
+        rangeAddedKm: 0,
+        energyDeliveredKwh: 0,
+        batteryTempC: 25,
         efficiencyKwhPer100Km: 18.2,
         autoRotate: false,
         isVehicleDrawerOpen: false,
         selectedSubsystem: null,
       },
 
-      // Stations & History
+      // Stations & History (Clean state: No fake history records)
       stations: MOCK_EV_STATIONS,
-      history: [
-        {
-          id: 'tx-01',
-          date: 'May 28, 2026',
-          time: '14:15',
-          stationName: 'Addis EV Hub (Bole Medhanialem)',
-          bayName: 'Bay 02',
-          energyKwh: 24.6,
-          powerKw: 86,
-          durationMin: 37,
-          totalCostEtb: 576,
-          ratePerKwh: 19.50,
-          paymentMethod: 'Telebirr',
-          transactionId: 'TB-9823481902',
-        },
-        {
-          id: 'tx-02',
-          date: 'May 27, 2026',
-          time: '11:04',
-          stationName: 'Kazanchis Green Charge',
-          bayName: 'Bay 03',
-          energyKwh: 22.1,
-          powerKw: 60,
-          durationMin: 32,
-          totalCostEtb: 397,
-          ratePerKwh: 18.00,
-          paymentMethod: 'CBE Birr',
-          transactionId: 'CBE-390192834',
-        },
-        {
-          id: 'tx-03',
-          date: 'May 25, 2026',
-          time: '16:45',
-          stationName: 'Mexico Square Rapid Port',
-          bayName: 'Bay 01',
-          energyKwh: 28.3,
-          powerKw: 120,
-          durationMin: 36,
-          totalCostEtb: 566,
-          ratePerKwh: 20.00,
-          paymentMethod: 'Telebirr',
-          transactionId: 'TB-7719284102',
-        },
-      ],
+      history: [],
 
       // Actions
       setView: (view) => set({ currentView: view }),
@@ -326,89 +331,359 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       setCopilotOpen: (open) => set({ isCopilotOpen: open }),
       toggleCopilot: () => set((state) => ({ isCopilotOpen: !state.isCopilotOpen })),
       setLanguage: (lang) => set({ language: lang }),
-      toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'cream' : 'dark' })),
-      setTheme: (theme) => set({ theme }),
+      toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'cream' : 'dark' })),
+      setTheme: (t) => set({ theme: t }),
       dismissCompletionNotification: () => set({ completionNotification: null }),
       openAuthModal: (mode = 'signup') => set({ isAuthModalOpen: true, authModalMode: mode }),
       closeAuthModal: () => set({ isAuthModalOpen: false }),
+      setPendingIntent: (intent) => set({ pendingIntent: intent }),
 
-      updateUserProfile: (profile) => set((state) => ({
-        user: { ...state.user, ...profile }
-      })),
-
-      selectCar: (car) => set((state) => ({
-        vehicle: {
-          ...state.vehicle,
-          id: car.id,
-          model: car.name,
-          brand: car.brand,
-          capacityKwh: car.capacityKwh,
-          maxRangeKm: car.rangeKm,
-          drive: car.drive,
-          acceleration: car.acceleration,
-          modelPath: car.modelPath,
-          scale: car.scale,
-          paintColor: car.paintColor || '#2DD4BF',
+      requireAuth: (intent) => {
+        const isAuth = get().user.isAuthenticated;
+        if (!isAuth) {
+          set({
+            pendingIntent: intent || null,
+            isAuthModalOpen: true,
+            authModalMode: 'signup',
+          });
+          return false;
         }
-      })),
+        return true;
+      },
 
-      updateUserBatterySoc: (soc) => set((state) => ({
-        vehicle: { ...state.vehicle, batterySoc: soc }
-      })),
+      loginUser: (dbUser) => {
+        const userId = dbUser.id;
+        const walletData = getUserWallet(userId);
+        const activeRes = getUserActiveReservation(userId);
+        const userSessions = getUserHistory(userId);
 
-      toggleNotificationSetting: (key) => set((state) => ({
-        notifications: {
-          ...state.notifications,
-          [key]: !state.notifications[key]
+        const chosenCar = AVAILABLE_CARS.find((c) => c.id === dbUser.vehicleId) || AVAILABLE_CARS[0];
+        const batterySoc = dbUser.batterySoc || 38;
+
+        const historyRecords: ChargingHistoryRecord[] = userSessions.map((s) => ({
+          id: s.id,
+          date: s.date,
+          time: new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          stationName: s.stationName,
+          bayName: s.bayNumber,
+          energyKwh: s.energyKwh,
+          powerKw: 120,
+          durationMin: s.durationMin,
+          totalCostEtb: s.costEtb,
+          ratePerKwh: s.ratePerKwh || 19.50,
+          paymentMethod: s.paymentMethod || 'Telebirr',
+          transactionId: s.transactionId || `TB-${s.id}`,
+        }));
+
+        set((state) => {
+          const nextReservation = activeRes
+            ? {
+                id: activeRes.id,
+                stationId: activeRes.stationId,
+                stationName: activeRes.stationName,
+                bayId: activeRes.bayId,
+                bayNumber: activeRes.bayNumber,
+                depositEtb: activeRes.depositEtb,
+                slotTime: activeRes.slotTime,
+                date: activeRes.date,
+                status: activeRes.status,
+                queuePosition: activeRes.queuePosition,
+                arrivalDeadlineMin: activeRes.arrivalDeadlineMin,
+                pinConfirmed: activeRes.pinConfirmed,
+              }
+            : null;
+
+          return {
+            user: {
+              id: dbUser.id,
+              name: dbUser.name,
+              email: dbUser.email,
+              phone: dbUser.phone,
+              isAuthenticated: true,
+              twoFactorEnabled: false,
+            },
+            vehicle: {
+              ...state.vehicle,
+              id: chosenCar.id,
+              model: chosenCar.name,
+              brand: chosenCar.brand,
+              capacityKwh: chosenCar.capacityKwh,
+              maxRangeKm: chosenCar.rangeKm,
+              modelPath: chosenCar.modelPath,
+              scale: chosenCar.scale,
+              batterySoc,
+            },
+            cockpitCharging: {
+              ...state.cockpitCharging,
+              battery: batterySoc,
+            },
+            wallet: {
+              balanceEtb: walletData.balance,
+              transactions: walletData.transactions,
+            },
+            reservation: nextReservation,
+            history: historyRecords,
+            isAuthModalOpen: false,
+          };
+        });
+
+        // Handle pending intent if user tried to perform an action as guest
+        const intent = get().pendingIntent;
+        if (intent?.view) {
+          set({ currentView: intent.view, pendingIntent: null });
+        } else {
+          set({ currentView: 'cockpit', pendingIntent: null });
         }
-      })),
+      },
 
-      setDefaultPaymentMethod: (id) => set((state) => ({
-        paymentMethods: state.paymentMethods.map((pm) => ({
-          ...pm,
-          isDefault: pm.id === id
-        }))
-      })),
+      loadUserData: (userId) => {
+        if (!userId) return;
+        const walletData = getUserWallet(userId);
+        const activeRes = getUserActiveReservation(userId);
+        const userSessions = getUserHistory(userId);
 
-      addPaymentMethod: (method) => set((state) => ({
-        paymentMethods: [
-          ...state.paymentMethods,
-          {
-            ...method,
-            id: `pm-${Date.now()}`
-          }
-        ]
-      })),
+        const historyRecords: ChargingHistoryRecord[] = userSessions.map((s) => ({
+          id: s.id,
+          date: s.date,
+          time: new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          stationName: s.stationName,
+          bayName: s.bayNumber,
+          energyKwh: s.energyKwh,
+          powerKw: 120,
+          durationMin: s.durationMin,
+          totalCostEtb: s.costEtb,
+          ratePerKwh: s.ratePerKwh || 19.50,
+          paymentMethod: s.paymentMethod || 'Telebirr',
+          transactionId: s.transactionId || `TB-${s.id}`,
+        }));
 
-      removePaymentMethod: (id) => set((state) => ({
-        paymentMethods: state.paymentMethods.filter((pm) => pm.id !== id)
-      })),
+        set({
+          wallet: {
+            balanceEtb: walletData.balance,
+            transactions: walletData.transactions,
+          },
+          history: historyRecords,
+          reservation: activeRes
+            ? {
+                id: activeRes.id,
+                stationId: activeRes.stationId,
+                stationName: activeRes.stationName,
+                bayId: activeRes.bayId,
+                bayNumber: activeRes.bayNumber,
+                depositEtb: activeRes.depositEtb,
+                slotTime: activeRes.slotTime,
+                date: activeRes.date,
+                status: activeRes.status,
+                queuePosition: activeRes.queuePosition,
+                arrivalDeadlineMin: activeRes.arrivalDeadlineMin,
+                pinConfirmed: activeRes.pinConfirmed,
+              }
+            : null,
+        });
+      },
 
-      toggleTwoFactor: () => set((state) => ({
-        user: { ...state.user, twoFactorEnabled: !state.user.twoFactorEnabled }
-      })),
+      updateUserProfile: (profile) =>
+        set((state) => ({
+          user: { ...state.user, ...profile },
+        })),
 
-      confirmReservation: (stationId, bayId) => {
+      selectCar: (car) =>
+        set((state) => ({
+          vehicle: {
+            ...state.vehicle,
+            id: car.id,
+            model: car.name,
+            brand: car.brand,
+            capacityKwh: car.capacityKwh,
+            maxRangeKm: car.rangeKm,
+            drive: car.drive,
+            acceleration: car.acceleration,
+            modelPath: car.modelPath,
+            scale: car.scale,
+          },
+        })),
+
+      updateUserBatterySoc: (soc) =>
+        set((state) => ({
+          vehicle: { ...state.vehicle, batterySoc: soc },
+          cockpitCharging: { ...state.cockpitCharging, battery: soc },
+        })),
+
+      toggleNotificationSetting: (key) =>
+        set((state) => ({
+          notifications: {
+            ...state.notifications,
+            [key]: !state.notifications[key],
+          },
+        })),
+
+      setDefaultPaymentMethod: (id) =>
+        set((state) => ({
+          paymentMethods: state.paymentMethods.map((pm) => ({
+            ...pm,
+            isDefault: pm.id === id,
+          })),
+        })),
+
+      addPaymentMethod: (method) =>
+        set((state) => ({
+          paymentMethods: [
+            ...state.paymentMethods,
+            { ...method, id: `pm-${Date.now()}` },
+          ],
+        })),
+
+      removePaymentMethod: (id) =>
+        set((state) => ({
+          paymentMethods: state.paymentMethods.filter((pm) => pm.id !== id),
+        })),
+
+      toggleTwoFactor: () =>
+        set((state) => ({
+          user: { ...state.user, twoFactorEnabled: !state.user.twoFactorEnabled },
+        })),
+
+      // Top up user-specific wallet
+      topupWalletBalance: (amount, method = 'Telebirr') => {
+        const userId = get().user.id;
+        if (!userId) return;
+        const res = topupWallet(userId, amount, method);
+        if (res.success) {
+          const fresh = getUserWallet(userId);
+          set({
+            wallet: {
+              balanceEtb: fresh.balance,
+              transactions: fresh.transactions,
+            },
+          });
+        }
+      },
+
+      // RESERVATION STATE MACHINE
+      confirmReservation: (stationId, bayId, slotTime = '18:00 - 18:30', date = 'Today, May 16') => {
+        const isAuth = get().requireAuth({
+          view: 'reservation',
+          action: 'confirm_reservation',
+          payload: { stationId, bayId },
+        });
+        if (!isAuth) {
+          return { success: false, error: 'Authentication required' };
+        }
+
+        const userId = get().user.id;
         const station = get().stations.find((s) => s.id === stationId) || get().stations[0];
         const bay = station.bays.find((b) => b.id === bayId) || station.bays[0];
+        const depositFee = 50.0; // Standard 50 ETB reservation fee
+
+        // Check wallet balance
+        const currentBalance = get().wallet.balanceEtb;
+        if (currentBalance < depositFee) {
+          return {
+            success: false,
+            error: `Insufficient wallet balance (${currentBalance} ETB). 50 ETB reservation fee required.`,
+          };
+        }
+
+        // Deduct reservation fee from user-isolated ledger
+        const deduction = deductWalletFee(userId, depositFee, 'RESERVATION_FEE', {
+          stationName: station.name,
+          bayNumber: bay.name,
+          description: `Reservation deposit for ${bay.name} at ${station.name}`,
+        });
+
+        if (!deduction.success) {
+          return { success: false, error: deduction.error };
+        }
+
+        // Create persistent user-isolated reservation
+        const newReservation: DbReservation = {
+          id: `RES-${Date.now().toString().slice(-4)}`,
+          userId,
+          stationId: station.id,
+          stationName: station.name,
+          bayId: bay.id,
+          bayNumber: bay.name,
+          depositEtb: depositFee,
+          slotTime,
+          date,
+          status: 'QUEUED',
+          queuePosition: 2, // Conceptually in line
+          arrivalDeadlineMin: 15,
+          pinConfirmed: true,
+          createdAt: Date.now(),
+        };
+
+        saveUserReservation(userId, newReservation);
+        const freshWallet = getUserWallet(userId);
 
         set({
           selectedStationId: station.id,
           selectedBayId: bay.id,
+          wallet: {
+            balanceEtb: freshWallet.balance,
+            transactions: freshWallet.transactions,
+          },
           reservation: {
+            id: newReservation.id,
+            stationId: station.id,
             stationName: station.name,
+            bayId: bay.id,
             bayNumber: bay.name,
-            depositEtb: 30.00,
+            depositEtb: depositFee,
+            slotTime,
+            date,
+            status: 'QUEUED',
+            queuePosition: 2,
             arrivalDeadlineMin: 15,
             pinConfirmed: true,
           },
           currentView: 'queue',
         });
+
+        return { success: true };
       },
 
+      setReadyToCharge: () => {
+        const userId = get().user.id;
+        const res = get().reservation;
+        if (!res) return;
+
+        updateReservationStatus(userId, 'READY_TO_CHARGE');
+        set((state) => ({
+          reservation: state.reservation
+            ? { ...state.reservation, status: 'READY_TO_CHARGE', queuePosition: 1 }
+            : null,
+        }));
+      },
+
+      cancelActiveReservation: () => {
+        const userId = get().user.id;
+        cancelUserReservation(userId);
+        set({
+          reservation: null,
+          selectedBayId: null,
+          selectedStationId: null,
+          currentView: 'find_charge',
+        });
+      },
+
+      // CHARGING STATE MACHINE
       startChargingSession: () => {
+        const isAuth = get().requireAuth();
+        if (!isAuth) return false;
+
+        const res = get().reservation;
+        // Require valid reservation in READY_TO_CHARGE or RESERVED state
+        if (!res) {
+          set({ currentView: 'find_charge' });
+          return false;
+        }
+
+        const userId = get().user.id;
+        updateReservationStatus(userId, 'CHARGING');
+
         set((state) => {
-          const currentSoc = state.vehicle.batterySoc || 66;
+          const currentSoc = state.vehicle.batterySoc || 38;
           const resetSoc = currentSoc >= 100 ? 38 : currentSoc;
           return {
             chargingSession: {
@@ -423,8 +698,20 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               ...state.vehicle,
               batterySoc: resetSoc,
             },
+            cockpitCharging: {
+              ...state.cockpitCharging,
+              status: 'charging',
+              battery: resetSoc,
+              chargingPower: 148,
+            },
+            reservation: state.reservation
+              ? { ...state.reservation, status: 'CHARGING' }
+              : null,
+            currentView: 'charging',
           };
         });
+
+        return true;
       },
 
       pauseChargingSession: () => {
@@ -433,7 +720,12 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             ...state.chargingSession,
             status: 'PAUSED',
             powerKw: 0,
-          }
+          },
+          cockpitCharging: {
+            ...state.cockpitCharging,
+            status: 'paused',
+            chargingPower: 0,
+          },
         }));
       },
 
@@ -443,7 +735,12 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             ...state.chargingSession,
             status: 'CHARGING',
             powerKw: 148,
-          }
+          },
+          cockpitCharging: {
+            ...state.cockpitCharging,
+            status: 'charging',
+            chargingPower: 148,
+          },
         }));
       },
 
@@ -456,34 +753,85 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             energyDeliveredKwh: 0,
             totalCostEtb: 0,
             elapsedSeconds: 0,
-          }
+          },
         }));
       },
 
       stopChargingSession: () => {
+        const userId = get().user.id;
         const s = get().chargingSession;
         const res = get().reservation;
-        const finalKwh = Number(s.energyDeliveredKwh.toFixed(2));
-        const finalCost = Math.round(finalKwh * s.ratePerKwh);
+        const vehicle = get().vehicle;
 
-        const newRecord: ChargingHistoryRecord = {
-          id: `tx-${Date.now()}`,
-          date: 'Today',
-          time: 'Just now',
-          stationName: res?.stationName || 'Addis EV Hub (Bole)',
-          bayName: res?.bayNumber || 'Bay 02',
-          energyKwh: finalKwh > 0 ? finalKwh : 18.5,
-          powerKw: s.powerKw,
-          durationMin: Math.max(1, Math.round(s.elapsedSeconds / 60)),
-          totalCostEtb: finalCost > 0 ? finalCost : 360,
-          ratePerKwh: s.ratePerKwh,
-          paymentMethod: 'Telebirr',
-          transactionId: `TB-${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-        };
+        const finalKwh = Number(s.energyDeliveredKwh.toFixed(2)) || 18.5;
+        const finalCost = Math.round(finalKwh * s.ratePerKwh) || 360;
+
+        // Deduct charging cost from wallet
+        if (userId) {
+          deductWalletFee(userId, finalCost, 'CHARGING_SESSION', {
+            stationName: res?.stationName || 'Addis EV Hub (Bole)',
+            bayNumber: res?.bayNumber || 'Bay 03',
+            description: `Charging Session (${finalKwh} kWh delivered at ${s.ratePerKwh} ETB/kWh)`,
+          });
+
+          // Record real completed session in DB
+          recordUserCompletedSession(userId, {
+            stationName: res?.stationName || 'Addis EV Hub (Bole)',
+            bayNumber: res?.bayNumber || 'Bay 03',
+            vehicleModel: vehicle.model,
+            energyKwh: finalKwh,
+            costEtb: finalCost,
+            durationMin: Math.max(1, Math.round(s.elapsedSeconds / 60)),
+            batterySocStart: 38,
+            batterySocEnd: vehicle.batterySoc || 90,
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            paymentMethod: 'Telebirr',
+            transactionId: `TB-${Date.now().toString().slice(-8)}`,
+            ratePerKwh: s.ratePerKwh,
+          });
+
+          // Clear completed reservation
+          cancelUserReservation(userId);
+        }
+
+        const freshWallet = userId ? getUserWallet(userId) : { balance: 0, transactions: [] };
+        const freshSessions = userId ? getUserHistory(userId) : [];
+
+        const updatedHistory: ChargingHistoryRecord[] = freshSessions.map((sess) => ({
+          id: sess.id,
+          date: sess.date,
+          time: new Date(sess.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          stationName: sess.stationName,
+          bayName: sess.bayNumber,
+          energyKwh: sess.energyKwh,
+          powerKw: 120,
+          durationMin: sess.durationMin,
+          totalCostEtb: sess.costEtb,
+          ratePerKwh: sess.ratePerKwh || 19.50,
+          paymentMethod: sess.paymentMethod || 'Telebirr',
+          transactionId: sess.transactionId || `TB-${sess.id}`,
+        }));
 
         set((state) => ({
           chargingSession: { ...state.chargingSession, status: 'COMPLETED', powerKw: 0 },
-          history: [newRecord, ...state.history],
+          cockpitCharging: {
+            ...state.cockpitCharging,
+            status: 'complete',
+            chargingPower: 0,
+            battery: state.vehicle.batterySoc,
+          },
+          reservation: null,
+          wallet: {
+            balanceEtb: freshWallet.balance,
+            transactions: freshWallet.transactions,
+          },
+          history: updatedHistory,
+          completionNotification: {
+            show: true,
+            message: `Charging completed: ${finalKwh} kWh delivered (${finalCost} ETB deducted from wallet).`,
+            finalKwh,
+            finalCostEtb: finalCost,
+          },
         }));
       },
 
@@ -495,237 +843,157 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         const currentSoc = vehicle.batterySoc || 38;
         const nextSeconds = s.elapsedSeconds + 1;
 
-        // Progress battery % smoothly: +1% every 3 seconds (~3 minutes to fill up from 38% to 100%)
-        const socIncrement = (nextSeconds % 3 === 0) ? 1 : 0;
+        // Progress battery smoothly: +1% every 3 seconds
+        const socIncrement = nextSeconds % 3 === 0 ? 1 : 0;
         const nextSoc = Math.min(100, currentSoc + socIncrement);
 
-        // Realistic dynamic power ~146-150 kW with small fluctuation
         const dynamicPower = Math.round(148 + Math.sin(nextSeconds * 0.5) * 2.5);
-        const addedKwh = Number((dynamicPower / 3600).toFixed(3)); // kWh delivered in 1 second
+        const addedKwh = Number((dynamicPower / 3600).toFixed(3));
         const nextKwh = Number((s.energyDeliveredKwh + addedKwh).toFixed(2));
         const nextCost = Math.round(nextKwh * s.ratePerKwh);
 
-        // Auto cutoff when target SoC or 100% is reached
+        // Auto completion if targetSoc or 100 reached
         if (nextSoc >= 100 || nextSoc >= (s.targetSoc || 100)) {
-          const res = get().reservation;
-          const finalKwh = Number((nextKwh + 0.1).toFixed(2));
-          const finalCost = Math.round(finalKwh * s.ratePerKwh) || 360;
-
-          const completeRecord: ChargingHistoryRecord = {
-            id: 'tx-' + Date.now(),
-            date: 'Today',
-            time: 'Just now',
-            stationName: res?.stationName || 'Addis EV Hub (Bole)',
-            bayName: res?.bayNumber || 'Bay 03',
-            energyKwh: finalKwh,
-            powerKw: 149,
-            durationMin: Math.max(1, Math.round(nextSeconds / 60)),
-            totalCostEtb: finalCost,
-            ratePerKwh: s.ratePerKwh,
-            paymentMethod: 'Telebirr',
-            transactionId: 'TB-' + Math.floor(1000000000 + Math.random() * 9000000000),
-          };
-
           set((state) => ({
-            chargingSession: {
-              ...state.chargingSession,
-              status: 'COMPLETED',
-              powerKw: 0,
-              energyDeliveredKwh: finalKwh,
-              totalCostEtb: finalCost,
-              elapsedSeconds: nextSeconds,
-            },
-            vehicle: {
-              ...state.vehicle,
-              batterySoc: 100,
-            },
-            history: [completeRecord, ...state.history],
-            completionNotification: {
-              show: true,
-              message: '🎉 Battery is Full (100%)! Contact charging session at Bay 03 complete. Please disconnect to avoid idle overstay fees.',
-              finalKwh: finalKwh,
-              finalCostEtb: finalCost,
-            },
+            vehicle: { ...state.vehicle, batterySoc: nextSoc },
+            cockpitCharging: { ...state.cockpitCharging, battery: nextSoc },
           }));
+          get().stopChargingSession();
           return;
         }
 
         set((state) => ({
           chargingSession: {
             ...state.chargingSession,
+            elapsedSeconds: nextSeconds,
             powerKw: dynamicPower,
             energyDeliveredKwh: nextKwh,
             totalCostEtb: nextCost,
-            elapsedSeconds: nextSeconds,
           },
           vehicle: {
             ...state.vehicle,
             batterySoc: nextSoc,
           },
+          cockpitCharging: {
+            ...state.cockpitCharging,
+            battery: nextSoc,
+            energyDeliveredKwh: nextKwh,
+            chargingPower: dynamicPower,
+          },
         }));
       },
 
-      toggleLock: () => set((state) => ({
-        vehicle: { ...state.vehicle, isLocked: !state.vehicle.isLocked }
-      })),
+      toggleLock: () =>
+        set((state) => ({
+          vehicle: { ...state.vehicle, isLocked: !state.vehicle.isLocked },
+        })),
 
-      togglePrecondition: () => set((state) => ({
-        vehicle: { ...state.vehicle, isPreconditioned: !state.vehicle.isPreconditioned }
-      })),
+      togglePrecondition: () =>
+        set((state) => ({
+          vehicle: {
+            ...state.vehicle,
+            isPreconditioned: !state.vehicle.isPreconditioned,
+          },
+        })),
 
-      logout: () => set((state) => ({
-        user: { ...state.user, isAuthenticated: false },
-        currentView: 'welcome',
-      })),
+      logout: () => {
+        set({
+          user: {
+            id: '',
+            name: '',
+            email: '',
+            phone: '',
+            isAuthenticated: false,
+            twoFactorEnabled: false,
+          },
+          wallet: {
+            balanceEtb: 0,
+            transactions: [],
+          },
+          reservation: null,
+          history: [],
+          chargingSession: {
+            status: 'IDLE',
+            powerKw: 0,
+            energyDeliveredKwh: 0,
+            totalCostEtb: 0,
+            ratePerKwh: 19.50,
+            targetSoc: 90,
+            elapsedSeconds: 0,
+          },
+          cockpitCharging: {
+            status: 'idle',
+            battery: 38,
+            targetBattery: 90,
+            chargingPower: 0,
+            estimatedMinutes: 0,
+            rangeAddedKm: 0,
+            energyDeliveredKwh: 0,
+            batteryTempC: 25,
+            efficiencyKwhPer100Km: 18.2,
+            autoRotate: false,
+            isVehicleDrawerOpen: false,
+            selectedSubsystem: null,
+          },
+          currentView: 'welcome',
+          pendingIntent: null,
+        });
+      },
 
-      // Cinematic Single Cockpit Action Implementations
+      // Cinematic Cockpit Actions
       startCockpitCharging: () => {
-        set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            status: 'starting',
-            chargingPower: 30,
-          }
-        }));
-
-        setTimeout(() => {
-          const current = get().cockpitCharging.status;
-          if (current === 'starting') {
-            set((state) => ({
-              cockpitCharging: {
-                ...state.cockpitCharging,
-                status: 'charging',
-                chargingPower: 120,
-              }
-            }));
-          }
-        }, 1200);
+        const isAuth = get().requireAuth();
+        if (!isAuth) return;
+        if (!get().reservation) {
+          set({ currentView: 'find_charge' });
+          return;
+        }
+        get().startChargingSession();
       },
 
-      pauseCockpitCharging: () => {
+      pauseCockpitCharging: () => get().pauseChargingSession(),
+      resumeCockpitCharging: () => get().resumeChargingSession(),
+      stopCockpitCharging: () => get().stopChargingSession(),
+
+      setCockpitAutoRotate: (auto) =>
         set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            status: 'paused',
-            chargingPower: 0,
-          }
-        }));
-      },
+          cockpitCharging: { ...state.cockpitCharging, autoRotate: auto },
+        })),
 
-      resumeCockpitCharging: () => {
-        set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            status: 'charging',
-            chargingPower: 120,
-          }
-        }));
-      },
-
-      stopCockpitCharging: () => {
-        set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            status: 'stopping',
-            chargingPower: 0,
-          }
-        }));
-
-        setTimeout(() => {
-          const current = get().cockpitCharging.status;
-          if (current === 'stopping') {
-            set((state) => ({
-              cockpitCharging: {
-                ...state.cockpitCharging,
-                status: 'idle',
-                chargingPower: 0,
-              }
-            }));
-          }
-        }, 700);
-      },
-
-      setCockpitAutoRotate: (auto) => {
-        set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            autoRotate: auto,
-          }
-        }));
-      },
-
-      toggleVehicleDrawer: () => {
+      toggleVehicleDrawer: () =>
         set((state) => ({
           cockpitCharging: {
             ...state.cockpitCharging,
             isVehicleDrawerOpen: !state.cockpitCharging.isVehicleDrawerOpen,
-          }
-        }));
-      },
+          },
+        })),
 
-      setVehicleDrawerOpen: (open) => {
+      setVehicleDrawerOpen: (open) =>
         set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            isVehicleDrawerOpen: open,
-          }
-        }));
-      },
+          cockpitCharging: { ...state.cockpitCharging, isVehicleDrawerOpen: open },
+        })),
 
-      setSelectedSubsystem: (sub) => {
+      setSelectedSubsystem: (sub) =>
         set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            selectedSubsystem: sub,
-          }
-        }));
-      },
+          cockpitCharging: { ...state.cockpitCharging, selectedSubsystem: sub },
+        })),
 
-      tickCockpitCharging: () => {
-        const c = get().cockpitCharging;
-        if (c.status !== 'charging') return;
-
-        if (c.battery >= c.targetBattery) {
-          set((state) => ({
-            cockpitCharging: {
-              ...state.cockpitCharging,
-              status: 'complete',
-              battery: 100,
-              chargingPower: 0,
-              estimatedMinutes: 0,
-            }
-          }));
-          return;
-        }
-
-        const nextBattery = Math.min(100, Number((c.battery + 0.15).toFixed(1)));
-        const nextEnergy = Number((c.energyDeliveredKwh + 0.04).toFixed(2));
-        const nextRange = Math.round(180 + (nextBattery - 67) * 4.2);
-        const nextMins = Math.max(1, Math.round((c.targetBattery - nextBattery) * 0.72));
-
-        set((state) => ({
-          cockpitCharging: {
-            ...state.cockpitCharging,
-            battery: nextBattery,
-            energyDeliveredKwh: nextEnergy,
-            rangeAddedKm: nextRange,
-            estimatedMinutes: nextMins,
-          }
-        }));
-      },
+      tickCockpitCharging: () => get().tickChargingSession(),
     }),
     {
-      name: 'chargeflow-storage-v3',
+      name: 'chargeflow-session-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        language: state.language,
+        theme: state.theme,
         user: state.user,
         vehicle: state.vehicle,
-        language: state.language,
-        notifications: state.notifications,
-        paymentMethods: state.paymentMethods,
+        wallet: state.wallet,
         reservation: state.reservation,
         history: state.history,
       }),
     }
   )
 );
+
+export default useChargeFlowStore;

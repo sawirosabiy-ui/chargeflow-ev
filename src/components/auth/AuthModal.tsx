@@ -16,16 +16,15 @@ import { useChargeFlowStore } from "../../store/useChargeFlowStore";
 import { AVAILABLE_CARS, CarSpec } from "../../data/cars";
 import { useTranslation } from "../../localization/useTranslation";
 import { getBatteryVisualState } from "../../utils/batteryVisualState";
+import { findDbUserByIdentifier, saveDbUser, DbUser } from "../../data/db";
 
 export const AuthModal: React.FC = () => {
   const { 
     isAuthModalOpen, 
     authModalMode, 
     closeAuthModal, 
-    updateUserProfile, 
-    selectCar, 
-    setView,
-    theme
+    loginUser, 
+    theme 
   } = useChargeFlowStore();
 
   const { t } = useTranslation();
@@ -37,21 +36,23 @@ export const AuthModal: React.FC = () => {
   React.useEffect(() => {
     if (isAuthModalOpen) {
       setMode(authModalMode || "signup");
+      setSignInError("");
+      setSignUpError("");
     }
   }, [isAuthModalOpen, authModalMode]);
 
-  // Sign In Fields
-  const [signInIdentifier, setSignInIdentifier] = useState("+251 91 234 5678");
-  const [signInPassword, setSignInPassword] = useState("••••••••");
+  // Sign In Fields (Clean, no fake prefilled data)
+  const [signInIdentifier, setSignInIdentifier] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
   const [signInError, setSignInError] = useState("");
 
-  // Create Account Fields (only required onboarding fields)
+  // Create Account Fields
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("+251 9");
   const [password, setPassword] = useState("");
   const [selectedCarId, setSelectedCarId] = useState("byd-atto-3");
-  const [batterySoc, setBatterySoc] = useState(72);
+  const [batterySoc, setBatterySoc] = useState(38);
   const [signUpError, setSignUpError] = useState("");
 
   if (!isAuthModalOpen) return null;
@@ -61,6 +62,8 @@ export const AuthModal: React.FC = () => {
   // Validate and submit Sign In
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
+    setSignInError("");
+
     if (!signInIdentifier.trim()) {
       setSignInError("Please enter your Ethiopian phone number or email");
       return;
@@ -70,23 +73,21 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    const isEmail = signInIdentifier.includes("@");
-    updateUserProfile({
-      name: isEmail ? signInIdentifier.split("@")[0] : "Abiy Tesfaye",
-      email: isEmail ? signInIdentifier : "abiy.tesfaye@gmail.com",
-      phone: isEmail ? "+251 91 234 5678" : signInIdentifier,
-    });
-    useChargeFlowStore.setState((s) => ({
-      user: { ...s.user, isAuthenticated: true },
-    }));
+    const existingUser = findDbUserByIdentifier(signInIdentifier);
+    if (!existingUser) {
+      setSignInError("No account found with this phone or email. Please create an account.");
+      return;
+    }
 
+    loginUser(existingUser);
     closeAuthModal();
-    setView("cockpit");
   };
 
   // Validate and submit Create Account
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
+    setSignUpError("");
+
     if (!name.trim()) {
       setSignUpError("Please enter your full name");
       return;
@@ -95,7 +96,7 @@ export const AuthModal: React.FC = () => {
       setSignUpError("Please enter a valid email address");
       return;
     }
-    if (!phone.trim() || phone.length < 9) {
+    if (!phone.trim() || phone.replace(/[\s-]/g, '').length < 10) {
       setSignUpError("Please enter a valid Ethiopian phone number (+251 9...)");
       return;
     }
@@ -104,22 +105,25 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    const chosenCar = AVAILABLE_CARS.find((c) => c.id === selectedCarId) || AVAILABLE_CARS[0];
-    selectCar(chosenCar);
+    const existingUser = findDbUserByIdentifier(email) || findDbUserByIdentifier(phone);
+    if (existingUser) {
+      setSignUpError("An account with this email or phone already exists. Please sign in.");
+      return;
+    }
 
-    updateUserProfile({
+    const newUser: DbUser = {
+      id: `USR-${Date.now().toString().slice(-6)}`,
       name: name.trim(),
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       phone: phone.trim(),
-    });
+      vehicleId: selectedCarId,
+      batterySoc,
+      createdAt: new Date().toISOString(),
+    };
 
-    useChargeFlowStore.setState((s) => ({
-      user: { ...s.user, isAuthenticated: true },
-      vehicle: { ...s.vehicle, batterySoc },
-    }));
-
+    saveDbUser(newUser);
+    loginUser(newUser);
     closeAuthModal();
-    setView("cockpit");
   };
 
   return (
@@ -171,264 +175,268 @@ export const AuthModal: React.FC = () => {
         {mode === "signin" && (
           <form onSubmit={handleSignIn} className="space-y-4 pt-5">
             <p className={`text-xs ${isCream ? "text-stone-600" : "text-slate-400"}`}>
-              {t.signInSubtitle}
+              {t.signInSubtitle || "Sign in to access your vehicle cockpit, wallet balance, and charging reservations."}
             </p>
 
             {signInError && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{signInError}</span>
               </div>
             )}
 
             {/* Phone or Email */}
-            <div className="space-y-1.5 text-left">
-              <label className={`text-xs font-semibold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                {t.phoneLabel} / {t.emailLabel}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                Ethiopian Phone or Email
               </label>
-              <div className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all ${
-                isCream 
-                  ? "bg-white border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20" 
-                  : "bg-white/5 border-white/10 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-400/20"
-              }`}>
-                <Smartphone className="w-4 h-4 text-teal-400 shrink-0" />
+              <div className="relative flex items-center">
+                <Smartphone className="w-4 h-4 text-teal-400 absolute left-3.5" />
                 <input
                   type="text"
                   value={signInIdentifier}
                   onChange={(e) => setSignInIdentifier(e.target.value)}
                   placeholder="+251 91 234 5678 or email"
-                  className="w-full bg-transparent text-xs sm:text-sm outline-none font-medium placeholder:text-slate-500"
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-mono border transition-all focus:outline-none ${
+                    isCream
+                      ? "bg-white border-stone-300 text-stone-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                      : "bg-[#050811] border-white/10 text-white placeholder-slate-500 focus:border-teal-400 focus:ring-1 focus:ring-teal-400"
+                  }`}
+                  required
                 />
               </div>
             </div>
 
             {/* Password */}
-            <div className="space-y-1.5 text-left">
-              <label className={`text-xs font-semibold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                {t.passwordLabel}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                Password
               </label>
-              <div className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all ${
-                isCream 
-                  ? "bg-white border-stone-300 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20" 
-                  : "bg-white/5 border-white/10 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-400/20"
-              }`}>
-                <Lock className="w-4 h-4 text-teal-400 shrink-0" />
+              <div className="relative flex items-center">
+                <Lock className="w-4 h-4 text-teal-400 absolute left-3.5" />
                 <input
                   type="password"
                   value={signInPassword}
                   onChange={(e) => setSignInPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-transparent text-xs sm:text-sm outline-none font-medium placeholder:text-slate-500"
+                  placeholder="Enter your password"
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-mono border transition-all focus:outline-none ${
+                    isCream
+                      ? "bg-white border-stone-300 text-stone-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                      : "bg-[#050811] border-white/10 text-white placeholder-slate-500 focus:border-teal-400 focus:ring-1 focus:ring-teal-400"
+                  }`}
+                  required
                 />
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Sign In CTA */}
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-black text-xs sm:text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(45,212,191,0.4)] hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-2"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all hover:scale-[1.01] cursor-pointer"
             >
               <span>{t.signIn}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            {/* Switch to Sign Up */}
-            <div className="pt-3 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signup");
-                  setSignInError("");
-                }}
-                className={`text-xs font-semibold transition-colors cursor-pointer hover:underline ${
-                  isCream ? "text-emerald-700" : "text-teal-400"
-                }`}
-              >
-                {t.dontHaveAccount}
-              </button>
+            {/* Switch Mode Prompt */}
+            <div className="pt-2 text-center">
+              <p className={`text-xs ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                {t.dontHaveAccount || "Don't have an account?"}{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signup");
+                    setSignInError("");
+                  }}
+                  className="text-teal-400 font-bold hover:underline cursor-pointer"
+                >
+                  {t.createAccount}
+                </button>
+              </p>
             </div>
           </form>
         )}
 
         {/* ================================================================= */}
-        {/* CREATE ACCOUNT FORM (Only the required onboarding fields)         */}
+        {/* CREATE ACCOUNT FORM (Concise, Onboarding Fields)                   */}
         {/* ================================================================= */}
         {mode === "signup" && (
           <form onSubmit={handleSignUp} className="space-y-3.5 pt-4">
             <p className={`text-xs ${isCream ? "text-stone-600" : "text-slate-400"}`}>
-              {t.createAccountSubtitle}
+              {t.createAccountSubtitle || "Set up your EV profile to reserve charging slots and manage smart energy."}
             </p>
 
             {signUpError && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{signUpError}</span>
               </div>
             )}
 
-            {/* Name & Email (2 columns on tablet/desktop) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-              {/* Full Name */}
+            {/* Row 1: Full Name & Email */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className={`text-[11px] font-semibold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                  {t.fullNameLabel}
+                <label className={`block text-[11px] font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                  Full Name
                 </label>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                  isCream ? "bg-white border-stone-300" : "bg-white/5 border-white/10"
-                }`}>
-                  <User className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <div className="relative flex items-center">
+                  <User className="w-3.5 h-3.5 text-teal-400 absolute left-3" />
                   <input
                     type="text"
-                    required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Abiy Tesfaye"
-                    className="w-full bg-transparent text-xs outline-none font-medium placeholder:text-slate-500"
+                    placeholder="Dawit Alemu"
+                    className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs border transition-all focus:outline-none ${
+                      isCream
+                        ? "bg-white border-stone-300 text-stone-900 focus:border-emerald-600"
+                        : "bg-[#050811] border-white/10 text-white placeholder-slate-500 focus:border-teal-400"
+                    }`}
+                    required
                   />
                 </div>
               </div>
 
-              {/* Email */}
               <div className="space-y-1">
-                <label className={`text-[11px] font-semibold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                  {t.emailLabel}
+                <label className={`block text-[11px] font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                  Email Address
                 </label>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                  isCream ? "bg-white border-stone-300" : "bg-white/5 border-white/10"
-                }`}>
-                  <Mail className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <div className="relative flex items-center">
+                  <Mail className="w-3.5 h-3.5 text-teal-400 absolute left-3" />
                   <input
                     type="email"
-                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="driver@chargeflow.et"
-                    className="w-full bg-transparent text-xs outline-none font-medium placeholder:text-slate-500"
+                    placeholder="dawit@gmail.com"
+                    className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs border transition-all focus:outline-none ${
+                      isCream
+                        ? "bg-white border-stone-300 text-stone-900 focus:border-emerald-600"
+                        : "bg-[#050811] border-white/10 text-white placeholder-slate-500 focus:border-teal-400"
+                    }`}
+                    required
                   />
                 </div>
               </div>
             </div>
 
-            {/* Phone & Password */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-              {/* Phone */}
+            {/* Row 2: Phone & Password */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className={`text-[11px] font-semibold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                  {t.phoneLabel}
+                <label className={`block text-[11px] font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                  Ethiopian Phone
                 </label>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                  isCream ? "bg-white border-stone-300" : "bg-white/5 border-white/10"
-                }`}>
-                  <Smartphone className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <div className="relative flex items-center">
+                  <Smartphone className="w-3.5 h-3.5 text-teal-400 absolute left-3" />
                   <input
                     type="tel"
-                    required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+251 91 234 5678"
-                    className="w-full bg-transparent text-xs outline-none font-medium placeholder:text-slate-500"
+                    className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs font-mono border transition-all focus:outline-none ${
+                      isCream
+                        ? "bg-white border-stone-300 text-stone-900 focus:border-emerald-600"
+                        : "bg-[#050811] border-white/10 text-white placeholder-slate-500 focus:border-teal-400"
+                    }`}
+                    required
                   />
                 </div>
               </div>
 
-              {/* Password */}
               <div className="space-y-1">
-                <label className={`text-[11px] font-semibold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                  {t.passwordLabel}
+                <label className={`block text-[11px] font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                  Create Password
                 </label>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                  isCream ? "bg-white border-stone-300" : "bg-white/5 border-white/10"
-                }`}>
-                  <Lock className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <div className="relative flex items-center">
+                  <Lock className="w-3.5 h-3.5 text-teal-400 absolute left-3" />
                   <input
                     type="password"
-                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min. 6 chars"
-                    className="w-full bg-transparent text-xs outline-none font-medium placeholder:text-slate-500"
+                    placeholder="Min 6 characters"
+                    className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs font-mono border transition-all focus:outline-none ${
+                      isCream
+                        ? "bg-white border-stone-300 text-stone-900 focus:border-emerald-600"
+                        : "bg-[#050811] border-white/10 text-white placeholder-slate-500 focus:border-teal-400"
+                    }`}
+                    required
                   />
                 </div>
               </div>
             </div>
 
-            {/* Vehicle Model Selection */}
-            <div className="space-y-1 text-left">
-              <label className={`text-[11px] font-semibold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                {t.vehicleModelLabel}
+            {/* EV Model Selection */}
+            <div className="space-y-1.5 pt-1">
+              <label className={`block text-[11px] font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                Select Your EV
               </label>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                isCream ? "bg-white border-stone-300" : "bg-white/5 border-white/10"
-              }`}>
-                <Car className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                <select
-                  value={selectedCarId}
-                  onChange={(e) => setSelectedCarId(e.target.value)}
-                  className={`w-full bg-transparent text-xs outline-none font-medium cursor-pointer ${
-                    isCream ? "text-stone-900" : "text-white"
-                  }`}
-                >
-                  {AVAILABLE_CARS.map((c) => (
-                    <option key={c.id} value={c.id} className="bg-slate-900 text-white">
-                      {c.name} ({c.capacity} · {c.range})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-32 overflow-y-auto pr-1">
+                {AVAILABLE_CARS.slice(0, 8).map((car) => (
+                  <button
+                    key={car.id}
+                    type="button"
+                    onClick={() => setSelectedCarId(car.id)}
+                    className={`p-2 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      selectedCarId === car.id
+                        ? "bg-teal-500/20 border-teal-400 text-white shadow-sm ring-1 ring-teal-400/50"
+                        : isCream
+                          ? "bg-white border-stone-300 text-stone-800 hover:bg-stone-50"
+                          : "bg-[#050811] border-white/10 text-slate-300 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-[10px] font-mono text-teal-400 font-bold">{car.brand}</span>
+                      {selectedCarId === car.id && <Check className="w-3 h-3 text-teal-400" />}
+                    </div>
+                    <div className="text-xs font-bold truncate mt-1">{car.name}</div>
+                    <div className="text-[9px] text-slate-400 font-mono">{car.rangeKm} km</div>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Current Battery Percentage Slider */}
-            <div className="space-y-1.5 text-left pt-1">
-              <div className="flex items-center justify-between">
-                <label className={`text-[11px] font-semibold flex items-center gap-1.5 ${isCream ? "text-stone-700" : "text-slate-300"}`}>
-                  <BatteryCharging className="w-3.5 h-3.5" style={{ color: batteryVisual.color }} />
-                  <span>{t.currentBatteryLabel}</span>
-                </label>
-                <span 
-                  className="font-mono font-bold text-xs px-2 py-0.5 rounded-full border"
-                  style={{
-                    color: batteryVisual.color,
-                    borderColor: batteryVisual.color,
-                    backgroundColor: `${batteryVisual.color}15`
-                  }}
-                >
-                  {batterySoc}% • {t[batteryVisual.labelKey]}
+            {/* Battery Level Slider */}
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className={`font-bold ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                  Current Battery SoC
+                </span>
+                <span className="font-mono font-bold text-xs" style={{ color: batteryVisual.color }}>
+                  {batterySoc}% ({t[batteryVisual.labelKey]})
                 </span>
               </div>
               <input
                 type="range"
-                min={5}
-                max={100}
-                step={1}
+                min={10}
+                max={98}
                 value={batterySoc}
-                onChange={(e) => setBatterySoc(Number(e.target.value))}
-                className="w-full accent-teal-400 cursor-pointer h-1.5 rounded-lg bg-slate-700"
+                onChange={(e) => setBatterySoc(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-400"
               />
             </div>
 
-            {/* Create Account Submit Button */}
+            {/* Submit Create Account CTA */}
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-black text-xs sm:text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(45,212,191,0.4)] hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-3"
+              className="w-full py-3 mt-2 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all hover:scale-[1.01] cursor-pointer"
             >
               <span>{t.createAccount}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            {/* Switch to Sign In */}
-            <div className="pt-2 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signin");
-                  setSignUpError("");
-                }}
-                className={`text-xs font-semibold transition-colors cursor-pointer hover:underline ${
-                  isCream ? "text-emerald-700" : "text-teal-400"
-                }`}
-              >
-                {t.alreadyHaveAccount}
-              </button>
+            {/* Switch Mode Prompt */}
+            <div className="text-center pt-1">
+              <p className={`text-xs ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                {t.alreadyHaveAccount || "Already have an account?"}{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signin");
+                    setSignUpError("");
+                  }}
+                  className="text-teal-400 font-bold hover:underline cursor-pointer"
+                >
+                  {t.signIn}
+                </button>
+              </p>
             </div>
           </form>
         )}

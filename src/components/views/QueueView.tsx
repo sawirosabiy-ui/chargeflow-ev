@@ -18,6 +18,7 @@ export const QueueView: React.FC = () => {
   const reservation = useChargeFlowStore((s) => s.reservation);
   const setView = useChargeFlowStore((s) => s.setView);
   const startChargingSession = useChargeFlowStore((s) => s.startChargingSession);
+  const setReadyToCharge = useChargeFlowStore((s) => s.setReadyToCharge);
   const theme = useChargeFlowStore((s) => s.theme);
   const { t } = useTranslation();
   const isCream = theme === 'cream';
@@ -25,12 +26,20 @@ export const QueueView: React.FC = () => {
   // Live countdown timer (simulating ~12 min wait)
   const [secondsRemaining, setSecondsRemaining] = useState(12 * 60);
 
+  const isReady = reservation?.status === 'READY_TO_CHARGE';
+
   useEffect(() => {
     const timer = setInterval(() => {
-      setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          setReadyToCharge();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [setReadyToCharge]);
 
   const minutes = Math.floor(secondsRemaining / 60);
   const seconds = secondsRemaining % 60;
@@ -51,9 +60,13 @@ export const QueueView: React.FC = () => {
             <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${isCream ? "text-stone-900" : "text-white"}`}>
               {t.queueTitle}
             </h1>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono font-bold text-emerald-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-              LIVE
+            <span className={`px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold flex items-center gap-1.5 ${
+              isReady
+                ? "bg-teal-500/20 border-teal-400 text-teal-300 shadow-[0_0_12px_rgba(45,212,191,0.4)]"
+                : "bg-amber-500/15 border-amber-500/30 text-amber-300"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isReady ? "bg-teal-400 animate-ping" : "bg-amber-400"}`}></span>
+              {isReady ? "READY TO CHARGE" : "QUEUED (#2 IN LINE)"}
             </span>
           </div>
           <p className={`text-xs sm:text-sm mt-1 ${isCream ? "text-stone-500" : "text-slate-400"}`}>
@@ -424,19 +437,41 @@ export const QueueView: React.FC = () => {
               </div>
             </div>
 
-            {/* CTAs */}
+            {/* CTAs with Strict Ready-to-Charge Lifecycle */}
             <div className="space-y-2.5 pt-2">
-              <button
-                onClick={handleStartCharging}
-                className="w-full py-3.5 rounded-2xl bg-[#2DD4BF] hover:bg-[#14B8A6] text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.4)] transition-all hover:scale-[1.01]"
-              >
-                <Zap className="w-4 h-4" />
-                <span>{t.startChargingNowBtn}</span>
-              </button>
+              {isReady ? (
+                <button
+                  onClick={handleStartCharging}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(45,212,191,0.4)] transition-all hover:scale-[1.01] cursor-pointer animate-pulse"
+                >
+                  <Zap className="w-4 h-4 fill-slate-950" />
+                  <span>Connect & Start Charging Now</span>
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    disabled
+                    className="w-full py-3.5 rounded-2xl bg-slate-800/80 border border-white/5 text-slate-400 font-bold text-xs flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
+                  >
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Waiting for Bay — #2 in Line</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setReadyToCharge()}
+                    className="w-full py-2 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 font-mono text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:border-teal-400"
+                    title="Simulate earlier vehicle finishing and vacating bay"
+                  >
+                    <Zap className="w-3 h-3 text-teal-400" />
+                    <span>Simulate Bay Available (Ready to Charge)</span>
+                  </button>
+                </div>
+              )}
 
               <button
                 onClick={() => setView('find_charge')}
-                className={`w-full py-3 rounded-2xl border font-semibold text-xs flex items-center justify-center gap-2 transition-all ${isCream ? "bg-stone-100 hover:bg-stone-200 border-stone-300 text-stone-800" : "bg-[#131A29] hover:bg-slate-800 border-white/10 text-slate-300 hover:text-white"}`}
+                className={`w-full py-3 rounded-2xl border font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${isCream ? "bg-stone-100 hover:bg-stone-200 border-stone-300 text-stone-800" : "bg-[#131A29] hover:bg-slate-800 border-white/10 text-slate-300 hover:text-white"}`}
               >
                 <Navigation className="w-4 h-4" />
                 <span>{t.navigateStationBtn}</span>

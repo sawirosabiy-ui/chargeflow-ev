@@ -23,6 +23,7 @@ import { getBatteryVisualState } from "../../utils/batteryVisualState";
 export const Header: React.FC = () => {
   const user = useChargeFlowStore((s) => s.user);
   const vehicle = useChargeFlowStore((s) => s.vehicle);
+  const wallet = useChargeFlowStore((s) => s.wallet);
   const selectCar = useChargeFlowStore((s) => s.selectCar);
   const isSidebarOpen = useChargeFlowStore((s) => s.isSidebarOpen);
   const toggleSidebar = useChargeFlowStore((s) => s.toggleSidebar);
@@ -249,16 +250,40 @@ export const Header: React.FC = () => {
           )}
         </button>
 
-        {/* User Profile Avatar Circle */}
-        <div 
-          onClick={() => openAuthModal("signin")}
-          className="w-8 h-8 rounded-full bg-emerald-950/80 border border-emerald-500/40 p-0.5 shadow-md cursor-pointer hover:scale-105 transition-transform flex items-center justify-center shrink-0"
-          title="Account / Sign In"
-        >
-          <span className="text-emerald-400 font-bold text-xs font-mono">
-            {user.name ? user.name.slice(0, 2).toUpperCase() : "AT"}
-          </span>
-        </div>
+        {/* Authenticated Wallet Pill + Profile Avatar OR Guest Sign In */}
+        {user.isAuthenticated ? (
+          <div className="flex items-center gap-2">
+            <div 
+              onClick={() => setView("settings")}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
+                isCream 
+                  ? "bg-white border-stone-200 text-stone-800 shadow-sm" 
+                  : "bg-[#0E1522] border-teal-500/30 text-teal-300 hover:border-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.2)]"
+              }`}
+              title="ChargeFlow Wallet Balance (Settings)"
+            >
+              <Zap className="w-3.5 h-3.5 text-teal-400 fill-teal-400" />
+              <span>{wallet.balanceEtb.toFixed(0)} ETB</span>
+            </div>
+
+            <div 
+              onClick={() => setView("settings")}
+              className="w-8 h-8 rounded-full bg-emerald-950/80 border border-emerald-500/40 p-0.5 shadow-md cursor-pointer hover:scale-105 transition-transform flex items-center justify-center shrink-0"
+              title={`${user.name || "User"} (Settings)`}
+            >
+              <span className="text-emerald-400 font-bold text-xs font-mono">
+                {user.name ? user.name.slice(0, 2).toUpperCase() : "CF"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => openAuthModal("signin")}
+            className="px-3.5 py-1.5 rounded-xl border border-teal-500/40 bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 font-bold text-xs transition-all hover:scale-105 cursor-pointer shadow-[0_0_15px_rgba(45,212,191,0.2)]"
+          >
+            {t.signIn}
+          </button>
+        )}
       </div>
     </header>
   );
