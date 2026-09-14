@@ -32,7 +32,15 @@ interface Message {
   timestamp: string;
   actions?: {
     label: string;
-    actionType: 'precondition' | 'lock' | 'unlock' | 'navigate_reserve' | 'navigate_stations' | 'navigate_wallet';
+    actionType:
+      | 'precondition'
+      | 'lock'
+      | 'unlock'
+      | 'navigate_reserve'
+      | 'navigate_stations'
+      | 'navigate_wallet'
+      | 'navigate_charging'
+      | 'start_charging';
     executed?: boolean;
   }[];
 }
@@ -49,6 +57,8 @@ export const AICopilotModal: React.FC = () => {
   const togglePrecondition = useChargeFlowStore((s) => s.togglePrecondition);
   const toggleLock = useChargeFlowStore((s) => s.toggleLock);
   const language = useChargeFlowStore((s) => s.language);
+  const startChargingSession = useChargeFlowStore((s) => s.startChargingSession);
+  const chargingSession = useChargeFlowStore((s) => s.chargingSession);
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -172,12 +182,67 @@ export const AICopilotModal: React.FC = () => {
     } else if (actionType === 'navigate_stations') {
       setView('find_charge');
       setCopilotOpen(false);
+    } else if (actionType === 'navigate_charging') {
+      setView('charging');
+      setCopilotOpen(false);
+    } else if (actionType === 'start_charging') {
+      const ok = startChargingSession();
+      if (ok) {
+        setView('charging');
+        setCopilotOpen(false);
+      }
     }
   };
 
   const generateAIResponse = (query: string): { text: string; actions?: Message['actions'] } => {
     const q = query.toLowerCase();
     const currentRange = Math.round(vehicle.maxRangeKm * (vehicle.batterySoc / 100));
+
+    // 0. Start Charging / Live Charging Session Command
+    if (
+      q.includes('start charging') ||
+      q.includes('start charge') ||
+      q.includes('begin charge') ||
+      q.includes('begin charging') ||
+      q.includes('ቻርጅ ጀምር') ||
+      q.includes('ቻርጅ አድርግ') ||
+      ((q.includes('charge') || q.includes('ቻርጅ')) && (q.includes('start') || q.includes('now') || q.includes('begin') || q.includes('ጀምር')))
+    ) {
+      if (chargingSession.status === 'CHARGING') {
+        return {
+          text: language === 'አማ'
+            ? '⚡ ቻርጅ ማድረግ አስቀድሞ በሂደት ላይ ነው! የቀጥታ መረጃ 148 kW እየተላለፈ ነው።'
+            : '⚡ Charging is already actively in progress! Live telemetry is streaming at 148 kW.',
+          actions: [
+            { label: language === 'አማ' ? '⚡ ወደ ቀጥታ ክፍለ-ጊዜ ሂድ' : '⚡ Go to Live Session', actionType: 'navigate_charging' }
+          ]
+        };
+      }
+
+      if (reservation && (reservation.status === 'RESERVED' || reservation.status === 'READY_TO_CHARGE' || reservation.status === 'NEXT_IN_QUEUE')) {
+        const ok = startChargingSession();
+        if (ok) {
+          return {
+            text: language === 'አማ'
+              ? `⚡ **ቻርጅ መሙላት ተጀምሯል!** በ${reservation.stationName} (${reservation.bayNumber}) ላይ 148 kW ኃይል እየተላከ ነው። ወደ ቀጥታ ክፍለ-ጊዜ ለመሄድ ከታች ይጫኑ።`
+              : `⚡ **Charging session started!** 148 kW high-power energy delivery active at ${reservation.stationName} (${reservation.bayNumber}). Tap below to view live 3D telemetry.`,
+            actions: [
+              { label: language === 'አማ' ? '⚡ የቀጥታ ክፍለ-ጊዜ ተመልከት' : '⚡ View Live Session', actionType: 'navigate_charging' }
+            ]
+          };
+        }
+      }
+
+      return {
+        text: language === 'አማ'
+          ? '⚠️ ቻርጅ ከመጀመርዎ በፊት ንቁ የተረጋገጠ ቦታ ማስያዣ (50 ብር ተቀማጭ የተከፈለበት) ያስፈልግዎታል። እባክዎ መጀመሪያ ቻርጀር ይምረጡ።'
+          : '⚠️ You need an active confirmed reservation (with 50 ETB deposit paid) before you can start charging. Please find and reserve a bay first.',
+        actions: [
+          { label: language === 'አማ' ? '📍 ቻርጀር ፈልግ' : '📍 Find a Charger', actionType: 'navigate_stations' },
+          { label: language === 'አማ' ? '📅 ቦታ ያስይዙ' : '📅 Reserve Bay', actionType: 'navigate_reserve' }
+        ]
+      };
+    }
 
     // 1. Preconditioning
     if (q.includes('precondition') || q.includes('ማሞቅ') || q.includes('warm') || q.includes('speed') || q.includes('heat')) {

@@ -866,7 +866,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             reservation: state.reservation
               ? { ...state.reservation, status: 'CHARGING' }
               : null,
-            currentView: 'cockpit',
+            currentView: 'charging',
           };
         });
 

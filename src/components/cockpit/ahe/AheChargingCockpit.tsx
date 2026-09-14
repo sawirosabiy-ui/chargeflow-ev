@@ -89,6 +89,7 @@ export const AheChargingCockpit: React.FC = () => {
   const handleStart = () => {
     playSoundChime("start");
     startChargingSession();
+    setView("charging");
   };
 
   const handleStop = () => {
