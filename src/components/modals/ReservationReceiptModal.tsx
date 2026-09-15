@@ -7,13 +7,14 @@ import {
   ShieldCheck, 
   ArrowRight, 
   Navigation, 
-  Calendar,
   RotateCcw,
   Sparkles,
   Car,
   Clock,
   ExternalLink,
-  Layers
+  Layers,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 
@@ -27,10 +28,12 @@ export const ReservationReceiptModal: React.FC = () => {
   const theme = useChargeFlowStore((s) => s.theme);
   const isCream = theme === 'cream';
 
-  // Animation Phase: 'feeding' (upward feed) -> 'settling' -> 'confirmed' (settled with checkmark & actions)
+  // Animation Phase: 'feeding' (slower upward feed) -> 'settling' -> 'confirmed' (settled with checkmark & actions)
   const [animationPhase, setAnimationPhase] = useState<'feeding' | 'settling' | 'confirmed'>('feeding');
   const [hasPlayedChime, setHasPlayedChime] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const ticketRef = useRef<HTMLDivElement>(null);
+  const soundControllerRef = useRef<{ stop: () => void } | null>(null);
 
   const shouldAnimate = receiptModal?.initialAnimation ?? true;
 
@@ -39,37 +42,165 @@ export const ReservationReceiptModal: React.FC = () => {
     && window.matchMedia 
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Stop sound on unmount
   useEffect(() => {
-    if (!receiptModal?.isOpen) return;
-
-    if (!shouldAnimate || prefersReducedMotion) {
-      setAnimationPhase('confirmed');
-      return;
-    }
-
-    setAnimationPhase('feeding');
-    setHasPlayedChime(false);
-
-    // Mechanical Feed Phase (0 - 2000ms)
-    const settleTimer = setTimeout(() => {
-      setAnimationPhase('settling');
-    }, 2000);
-
-    // Final Confirmed State with Checkmark & Controls (2300ms)
-    const confirmedTimer = setTimeout(() => {
-      setAnimationPhase('confirmed');
-      playConfirmationChime();
-    }, 2350);
-
     return () => {
-      clearTimeout(settleTimer);
-      clearTimeout(confirmedTimer);
+      soundControllerRef.current?.stop();
     };
-  }, [receiptModal?.isOpen, shouldAnimate, prefersReducedMotion]);
+  }, []);
+
+  // Authentic Web Audio API Synthesizer for Thermal Receipt Machine Sound
+  // Generates:
+  // 1. Stepper motor gear whine with slight mechanical load variation (~170Hz - 190Hz)
+  // 2. Bandpass-filtered thermal paper hiss with rhythmic 85ms micro-pulses (as each dot line feeds upward)
+  // 3. Digital thermal print-head chatter
+  // 4. Mechanical cutter snip ("chhk-tick!") when the receipt finishes emerging
+  const startReceiptPrinterSound = () => {
+    if (isMuted) return;
+    soundControllerRef.current?.stop();
+
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      const feedDuration = 3.6; // active thermal printing duration (sec)
+      const now = ctx.currentTime;
+      const sampleRate = ctx.sampleRate;
+
+      // 1. Thermal Paper Friction & Hiss Noise
+      const bufferSize = Math.floor(sampleRate * (feedDuration + 0.3));
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      const noiseSource = ctx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+
+      const paperFilter = ctx.createBiquadFilter();
+      paperFilter.type = 'bandpass';
+      paperFilter.frequency.setValueAtTime(1750, now);
+      paperFilter.Q.setValueAtTime(1.9, now);
+
+      const stepperGain = ctx.createGain();
+      const pulseInterval = 0.085; // 85ms rhythm per thermal line advance
+
+      for (let t = 0; t < feedDuration; t += pulseInterval) {
+        const pTime = now + t;
+        stepperGain.gain.setValueAtTime(0.001, pTime);
+        stepperGain.gain.linearRampToValueAtTime(0.042, pTime + 0.02);
+        stepperGain.gain.exponentialRampToValueAtTime(0.006, pTime + pulseInterval * 0.72);
+        stepperGain.gain.setValueAtTime(0.001, pTime + pulseInterval * 0.95);
+      }
+      stepperGain.gain.setValueAtTime(0, now + feedDuration);
+
+      // 2. Stepper Motor Gear Whine
+      const motorOsc = ctx.createOscillator();
+      motorOsc.type = 'triangle';
+      motorOsc.frequency.setValueAtTime(178, now);
+      for (let t = 0; t < feedDuration; t += pulseInterval * 2) {
+        motorOsc.frequency.setValueAtTime(174, now + t);
+        motorOsc.frequency.linearRampToValueAtTime(188, now + t + pulseInterval);
+      }
+
+      const motorGain = ctx.createGain();
+      motorGain.gain.setValueAtTime(0.014, now);
+      motorGain.gain.linearRampToValueAtTime(0.02, now + 1.5);
+      motorGain.gain.setValueAtTime(0, now + feedDuration);
+
+      // 3. Digital Print Head Chatter
+      const headOsc = ctx.createOscillator();
+      headOsc.type = 'square';
+      headOsc.frequency.setValueAtTime(680, now);
+
+      const headGain = ctx.createGain();
+      headGain.gain.setValueAtTime(0.003, now);
+      for (let t = 0; t < feedDuration; t += pulseInterval) {
+        const pTime = now + t;
+        headGain.gain.setValueAtTime(0.005, pTime);
+        headGain.gain.setValueAtTime(0.0008, pTime + pulseInterval * 0.5);
+      }
+      headGain.gain.setValueAtTime(0, now + feedDuration);
+
+      // Connect noise and oscillators to master
+      noiseSource.connect(paperFilter);
+      paperFilter.connect(stepperGain);
+      stepperGain.connect(ctx.destination);
+
+      motorOsc.connect(motorGain);
+      motorGain.connect(ctx.destination);
+
+      headOsc.connect(headGain);
+      headGain.connect(ctx.destination);
+
+      noiseSource.start(now);
+      motorOsc.start(now);
+      headOsc.start(now);
+
+      noiseSource.stop(now + feedDuration + 0.3);
+      motorOsc.stop(now + feedDuration + 0.3);
+      headOsc.stop(now + feedDuration + 0.3);
+
+      // 4. Mechanical Cutter Snip at Completion (3.6s)
+      const cutterTime = now + feedDuration;
+      const cutterNoise = ctx.createBufferSource();
+      const cutterSize = Math.floor(sampleRate * 0.08);
+      const cutterBuf = ctx.createBuffer(1, cutterSize, sampleRate);
+      const cData = cutterBuf.getChannelData(0);
+      for (let i = 0; i < cutterSize; i++) {
+        cData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sampleRate * 0.016));
+      }
+      cutterNoise.buffer = cutterBuf;
+
+      const cutterFilter = ctx.createBiquadFilter();
+      cutterFilter.type = 'highpass';
+      cutterFilter.frequency.setValueAtTime(2500, cutterTime);
+
+      const cutterGain = ctx.createGain();
+      cutterGain.gain.setValueAtTime(0.075, cutterTime);
+      cutterGain.gain.exponentialRampToValueAtTime(0.001, cutterTime + 0.07);
+
+      cutterNoise.connect(cutterFilter);
+      cutterFilter.connect(cutterGain);
+      cutterGain.connect(ctx.destination);
+
+      cutterNoise.start(cutterTime);
+      cutterNoise.stop(cutterTime + 0.1);
+
+      soundControllerRef.current = {
+        stop: () => {
+          try {
+            stepperGain.gain.cancelScheduledValues(ctx.currentTime);
+            stepperGain.gain.setValueAtTime(0, ctx.currentTime);
+            motorGain.gain.cancelScheduledValues(ctx.currentTime);
+            motorGain.gain.setValueAtTime(0, ctx.currentTime);
+            headGain.gain.cancelScheduledValues(ctx.currentTime);
+            headGain.gain.setValueAtTime(0, ctx.currentTime);
+            cutterGain.gain.cancelScheduledValues(ctx.currentTime);
+            cutterGain.gain.setValueAtTime(0, ctx.currentTime);
+            noiseSource.stop();
+            motorOsc.stop();
+            headOsc.stop();
+            cutterNoise.stop();
+            ctx.close();
+          } catch {}
+        },
+      };
+    } catch {
+      // Audio not permitted or not supported
+    }
+  };
 
   // Subtle luxury EV confirmation chime synthesized via Web Audio API
   const playConfirmationChime = () => {
-    if (hasPlayedChime) return;
+    if (isMuted || hasPlayedChime) return;
     setHasPlayedChime(true);
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -105,19 +236,59 @@ export const ReservationReceiptModal: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!receiptModal?.isOpen) return;
+
+    if (!shouldAnimate || prefersReducedMotion) {
+      setAnimationPhase('confirmed');
+      return;
+    }
+
+    setAnimationPhase('feeding');
+    setHasPlayedChime(false);
+
+    // Start authentic receipt printer sound
+    startReceiptPrinterSound();
+
+    // Slower, deliberate mechanical feed phase (0 - 3600ms)
+    const settleTimer = setTimeout(() => {
+      setAnimationPhase('settling');
+    }, 3600);
+
+    // Final Confirmed State with Checkmark & Controls (3900ms)
+    const confirmedTimer = setTimeout(() => {
+      setAnimationPhase('confirmed');
+      playConfirmationChime();
+    }, 3900);
+
+    return () => {
+      clearTimeout(settleTimer);
+      clearTimeout(confirmedTimer);
+      soundControllerRef.current?.stop();
+    };
+  }, [receiptModal?.isOpen, shouldAnimate, prefersReducedMotion]);
+
   const handleSkipAnimation = () => {
+    soundControllerRef.current?.stop();
     setAnimationPhase('confirmed');
     playConfirmationChime();
   };
 
   const handleReplayAnimation = () => {
+    soundControllerRef.current?.stop();
     setAnimationPhase('feeding');
     setHasPlayedChime(false);
-    setTimeout(() => setAnimationPhase('settling'), 2000);
+    startReceiptPrinterSound();
+    setTimeout(() => setAnimationPhase('settling'), 3600);
     setTimeout(() => {
       setAnimationPhase('confirmed');
       playConfirmationChime();
-    }, 2350);
+    }, 3900);
+  };
+
+  const handleClose = () => {
+    soundControllerRef.current?.stop();
+    closeReceiptModal();
   };
 
   if (!receiptModal?.isOpen) return null;
@@ -146,22 +317,22 @@ export const ReservationReceiptModal: React.FC = () => {
   const estimatedCost = estimatedEnergyCostEtb || 360;
 
   const handleGoToLiveSession = () => {
-    closeReceiptModal();
+    handleClose();
     setView('charging');
   };
 
   const handleViewReservation = () => {
-    closeReceiptModal();
+    handleClose();
     setView('reservation');
   };
 
   const handleBackToCockpit = () => {
-    closeReceiptModal();
+    handleClose();
     setView('cockpit');
   };
 
   const handleGetDirections = () => {
-    closeReceiptModal();
+    handleClose();
     openDirectionsModal({
       name: stationName,
       address: 'Bole Road, Near Bole Medhanialem, Addis Ababa',
@@ -175,7 +346,7 @@ export const ReservationReceiptModal: React.FC = () => {
   const isComplete = animationPhase === 'confirmed';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in select-none overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in select-none overflow-y-auto scroll-smooth">
       <div 
         className={`relative w-full max-w-md my-auto rounded-3xl border shadow-2xl transition-all duration-300 overflow-hidden flex flex-col ${
           isCream
@@ -199,6 +370,13 @@ export const ReservationReceiptModal: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              title={isMuted ? 'Unmute printer sound' : 'Mute printer sound'}
+              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 text-teal-400" />}
+            </button>
             {isComplete && (
               <button
                 onClick={handleReplayAnimation}
@@ -217,7 +395,7 @@ export const ReservationReceiptModal: React.FC = () => {
               </button>
             )}
             <button
-              onClick={closeReceiptModal}
+              onClick={handleClose}
               className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -238,11 +416,11 @@ export const ReservationReceiptModal: React.FC = () => {
               <CheckCircle2 className={`w-4 h-4 stroke-[2.5] ${isComplete ? 'animate-in zoom-in-50 duration-300' : ''}`} />
             </div>
             <h2 className="text-sm sm:text-base font-black tracking-wider uppercase text-white font-mono">
-              {isComplete ? 'RESERVATION CONFIRMED' : 'ISSUING DIGITAL PASS...'}
+              {isComplete ? 'RESERVATION CONFIRMED' : 'PRINTING DIGITAL RECEIPT...'}
             </h2>
           </div>
           <p className="text-[11px] text-slate-400 font-sans">
-            {isComplete ? 'Your charging slot is secured.' : 'Thermal emitter active • Encrypting station verification token'}
+            {isComplete ? 'Your charging slot is secured.' : 'Thermal head feeding • Stepper motor active'}
           </p>
         </div>
 
