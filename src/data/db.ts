@@ -83,6 +83,8 @@ export interface DbReservation {
   arrivalDeadlineMin: number;
   pinConfirmed: boolean;
   createdAt: number;
+  authCode?: string; // 4-digit unique dispenser unlock PIN
+  authCodeExpiresAt?: number; // 1-hour expiration timestamp
 }
 
 export interface OtpRecord {
@@ -544,6 +546,29 @@ export const promoteNextInQueue = (stationId: string, bayId: string): DbReservat
   } catch {}
 
   return nextUser.res;
+};
+
+/**
+ * Validate a user's 4-digit dispenser unlock PIN against their reservation.
+ * Verifies code matching and enforces the 1-hour expiration limit.
+ */
+export const validateReservationAuthCode = (
+  reservation: DbReservation | null,
+  enteredPin: string
+): { valid: boolean; error?: 'NO_RESERVATION' | 'EXPIRED' | 'INVALID_PIN' } => {
+  if (!reservation) return { valid: false, error: 'NO_RESERVATION' };
+  
+  // Enforce 1-hour validity expiration
+  if (reservation.authCodeExpiresAt && Date.now() > reservation.authCodeExpiresAt) {
+    return { valid: false, error: 'EXPIRED' };
+  }
+
+  // If reservation has a 4-digit code, check exact match
+  if (reservation.authCode && reservation.authCode !== enteredPin.trim()) {
+    return { valid: false, error: 'INVALID_PIN' };
+  }
+
+  return { valid: true };
 };
 
 // ---------------------------------------------------------------------------

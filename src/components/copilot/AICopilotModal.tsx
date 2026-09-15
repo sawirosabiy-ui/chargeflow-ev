@@ -219,7 +219,24 @@ export const AICopilotModal: React.FC = () => {
         };
       }
 
-      if (reservation && (reservation.status === 'RESERVED' || reservation.status === 'READY_TO_CHARGE' || reservation.status === 'NEXT_IN_QUEUE')) {
+      if (reservation && (reservation.status === 'RESERVED' || reservation.status === 'READY_TO_CHARGE' || reservation.status === 'NEXT_IN_QUEUE' || reservation.status === 'CHARGING')) {
+        // Check if query contains a 4-digit PIN
+        const pinMatch = q.match(/\b\d{4}\b/);
+        if (pinMatch) {
+          const ok = startChargingSession(pinMatch[0]);
+          if (ok) {
+            return {
+              text: language === 'አማ'
+                ? `⚡ **የፒን ኮድ ተረጋግጧል!** ቻርጅ መሙላት በ${reservation.stationName} (${reservation.bayNumber}) ላይ 148 kW ተጀምሯል። ወደ ቀጥታ ክፍለ-ጊዜ ለመሄድ ከታች ይጫኑ።`
+                : `⚡ **Dispenser Unlocked & Charging Started!** 148 kW high-power energy delivery is now active at ${reservation.stationName} (${reservation.bayNumber}). Tap below to view live 3D telemetry.`,
+              actions: [
+                { label: language === 'አማ' ? '⚡ የቀጥታ ክፍለ-ጊዜ ተመልከት' : '⚡ View Live Session', actionType: 'navigate_charging' }
+              ]
+            };
+          }
+        }
+
+        // If PIN is already confirmed or starts directly
         const ok = startChargingSession();
         if (ok) {
           return {
@@ -231,6 +248,16 @@ export const AICopilotModal: React.FC = () => {
             ]
           };
         }
+
+        // If PIN needed, guide user to Live Session to enter 4-digit PIN
+        return {
+          text: language === 'አማ'
+            ? `⚡ **ቦታ ማስያዣ ተረጋግጧል!** ቻርጀሩን (${reservation.bayNumber}) ለመክፈት እባክዎ ከደረሰኝዎ ላይ ያለውን 4-ዲጂት ፒን ኮድ በቀጥታ ክፍለ-ጊዜ ያስገቡ ወይም እዚህ ይጻፉ።`
+            : `⚡ **Reservation confirmed for ${reservation.bayNumber}!** To unlock the dispenser and start 148 kW fast charging, please enter your 4-digit PIN in the Live Session, or reply here with your 4-digit code.`,
+          actions: [
+            { label: language === 'አማ' ? '⚡ ፒን አስገባ እና ቻርጅ ጀምር' : '⚡ Enter PIN & Start Charging', actionType: 'navigate_charging' }
+          ]
+        };
       }
 
       return {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useChargeFlowStore } from "../../../store/useChargeFlowStore";
+import { getUserActiveReservation } from "../../../data/db";
 import { useTranslation } from "../../../localization/useTranslation";
 import { AheStation3DStage } from "./AheStation3DStage";
 import { AheBatteryHUD } from "./AheBatteryHUD";
@@ -11,15 +12,30 @@ import { AheActionButtons } from "./AheActionButtons";
 import { AheSessionModal } from "./AheSessionModal";
 import { AheHologramFloor } from "./AheHologramFloor";
 import { AICopilotModal } from "../../copilot/AICopilotModal";
-import { Hand, AlertCircle, ArrowRight, Zap, Lock } from "lucide-react";
+import { 
+  Hand, 
+  AlertCircle, 
+  ArrowRight, 
+  Zap, 
+  Lock, 
+  KeyRound, 
+  Timer, 
+  ShieldCheck, 
+  X, 
+  Delete, 
+  FileText 
+} from "lucide-react";
 
 export const AheChargingCockpit: React.FC = () => {
   const { t } = useTranslation();
   const {
+    user,
     vehicle,
     reservation,
     chargingSession,
     startChargingSession,
+    verifyAndStartCharging,
+    openReceiptModal,
     stopChargingSession,
     confirmReservation,
     setView,
@@ -85,11 +101,98 @@ export const AheChargingCockpit: React.FC = () => {
     }
   };
 
+  // 4-Digit Dispenser Unlock PIN Modal State
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [isPinShake, setIsPinShake] = useState(false);
+  const [pinRemainingSec, setPinRemainingSec] = useState<number | null>(null);
+
+  const activeReservation = reservation || (user?.id ? getUserActiveReservation(user.id) : null);
+
+  // Sync remaining validity seconds for the 1-hour PIN
+  useEffect(() => {
+    if (!isPinModalOpen || !activeReservation?.authCodeExpiresAt) return;
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.floor((activeReservation.authCodeExpiresAt! - Date.now()) / 1000));
+      setPinRemainingSec(remaining);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [isPinModalOpen, activeReservation?.authCodeExpiresAt]);
+
+  const submitPin = (pinToSubmit: string) => {
+    const res = verifyAndStartCharging(pinToSubmit);
+    if (res.success) {
+      playSoundChime("start");
+      setIsPinModalOpen(false);
+      setPinInput('');
+      setPinError(null);
+      setView("charging");
+    } else {
+      setIsPinShake(true);
+      setTimeout(() => setIsPinShake(false), 500);
+      if (res.error === 'EXPIRED') {
+        setPinError('⚠️ This 4-digit PIN has expired (valid for 1 hour from reservation). Please re-reserve.');
+      } else if (res.error === 'INVALID_PIN') {
+        setPinError('❌ Incorrect PIN. Please check your reservation ticket.');
+      } else {
+        setPinError('Unable to authorize charging dispenser. Please check your reservation.');
+      }
+    }
+  };
+
+  const handlePinDigit = (digit: string) => {
+    if (pinInput.length >= 4) return;
+    setPinError(null);
+    const newPin = pinInput + digit;
+    setPinInput(newPin);
+    if (newPin.length === 4) {
+      submitPin(newPin);
+    }
+  };
+
+  const handlePinDelete = () => {
+    setPinError(null);
+    setPinInput((prev) => prev.slice(0, -1));
+  };
+
+  const handlePinClear = () => {
+    setPinError(null);
+    setPinInput('');
+  };
+
+  // Physical keyboard support for 4-digit PIN entry
+  useEffect(() => {
+    if (!isPinModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (/^[0-9]$/.test(e.key)) {
+        handlePinDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        handlePinDelete();
+      } else if (e.key === 'Escape') {
+        setIsPinModalOpen(false);
+      } else if (e.key === 'Enter' && pinInput.length === 4) {
+        submitPin(pinInput);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPinModalOpen, pinInput]);
+
   // Handlers for charging session
   const handleStart = () => {
-    playSoundChime("start");
-    startChargingSession();
-    setView("charging");
+    if (isCharging) return;
+    const activeRes = reservation || (user?.id ? getUserActiveReservation(user.id) : null);
+    if (!activeRes) {
+      setUnauthorizedModalOpen(true, 'Bay 03', 'Addis EV Hub (Bole)');
+      return;
+    }
+    // Prompt for 4-digit dispenser unlock PIN from receipt
+    setPinInput('');
+    setPinError(null);
+    setIsPinModalOpen(true);
   };
 
   const handleStop = () => {
@@ -320,6 +423,159 @@ export const AheChargingCockpit: React.FC = () => {
                 className="w-full py-3 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer"
               >
                 YES, STOP CHARGING
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10.4 4-DIGIT DISPENSER UNLOCK PIN MODAL (Enforces 1-hour code validity) */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
+          <div className={`relative border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-4 animate-in zoom-in-95 duration-200 shadow-[0_0_50px_rgba(45,212,191,0.25)] text-center ${
+            isPinShake ? 'animate-shake' : ''
+          } ${
+            isCream 
+              ? "bg-[#FAF7F2] border-teal-600/30 text-slate-900" 
+              : "bg-[#090F1C] border-teal-400/40 text-white"
+          }`}>
+            {/* Close Button */}
+            <button 
+              onClick={() => setIsPinModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Glowing Icon Badge */}
+            <div className="w-14 h-14 rounded-2xl bg-teal-500/15 border border-teal-400/40 flex items-center justify-center mx-auto text-teal-400 shadow-[0_0_25px_rgba(45,212,191,0.35)]">
+              <KeyRound className="w-7 h-7 stroke-[2.5]" />
+            </div>
+
+            {/* Header & Subtitle */}
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-teal-500/15 border border-teal-400/30 text-teal-300 font-mono text-[10px] font-bold uppercase tracking-wider">
+                <ShieldCheck className="w-3 h-3" />
+                Dispenser Authorization
+              </div>
+              <h3 className="text-xl font-black tracking-tight uppercase">
+                ENTER 4-DIGIT PIN
+              </h3>
+              <p className={`text-xs leading-relaxed ${isCream ? "text-slate-600" : "text-slate-300"}`}>
+                Enter the 4-digit code from your reservation receipt to unlock <strong className="text-teal-400">{activeReservation?.bayNumber || 'Bay 03'}</strong>.
+              </p>
+
+              {/* 1-Hour Validity Countdown Pill */}
+              {pinRemainingSec !== null && (
+                <div className="pt-1">
+                  {pinRemainingSec > 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 font-mono text-[11px] font-semibold">
+                      <Timer className="w-3 h-3 animate-pulse" />
+                      Expires in {Math.floor(pinRemainingSec / 60)}m {(pinRemainingSec % 60).toString().padStart(2, '0')}s
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono text-[11px] font-bold">
+                      <AlertCircle className="w-3 h-3" />
+                      PIN Expired (&gt; 1 hour)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 4 Digit Boxes */}
+            <div className="flex items-center justify-center gap-2.5 sm:gap-3 py-1">
+              {[0, 1, 2, 3].map((index) => {
+                const char = pinInput[index];
+                const isCurrent = pinInput.length === index;
+                return (
+                  <div
+                    key={index}
+                    className={`w-12 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-mono font-black transition-all ${
+                      char
+                        ? 'border-teal-400 bg-teal-500/10 text-teal-300 shadow-[0_0_15px_rgba(45,212,191,0.25)]'
+                        : isCurrent
+                        ? 'border-teal-400/80 bg-white/5 animate-pulse'
+                        : 'border-white/10 bg-white/[0.02] text-slate-500'
+                    }`}
+                  >
+                    {char ? char : isCurrent ? '·' : ''}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Error Message */}
+            {pinError && (
+              <div className="text-rose-400 text-xs font-semibold px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 animate-in fade-in flex items-center justify-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{pinError}</span>
+              </div>
+            )}
+
+            {/* High-Tech Virtual Numeric Keypad */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 max-w-[260px] mx-auto">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                <button
+                  key={digit}
+                  type="button"
+                  onClick={() => handlePinDigit(digit)}
+                  className="h-10 rounded-xl bg-white/5 hover:bg-teal-500/20 active:scale-95 border border-white/10 hover:border-teal-400/40 text-white font-mono text-base font-bold transition-all flex items-center justify-center cursor-pointer"
+                >
+                  {digit}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handlePinClear}
+                className="h-10 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-400 font-mono text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                title="Clear"
+              >
+                C
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePinDigit('0')}
+                className="h-10 rounded-xl bg-white/5 hover:bg-teal-500/20 active:scale-95 border border-white/10 hover:border-teal-400/40 text-white font-mono text-base font-bold transition-all flex items-center justify-center cursor-pointer"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={handlePinDelete}
+                className="h-10 rounded-xl bg-white/5 hover:bg-rose-500/20 active:scale-95 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-300 font-mono text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                title="Backspace"
+              >
+                <Delete className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Bottom Actions: View Ticket / Start */}
+            <div className="space-y-2 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                disabled={pinInput.length !== 4}
+                onClick={() => submitPin(pinInput)}
+                className={`w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
+                  pinInput.length === 4
+                    ? 'bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 shadow-[0_0_20px_rgba(45,212,191,0.35)] scale-[1.01]'
+                    : 'bg-white/10 text-slate-500 opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                UNLOCK &amp; START CHARGING
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPinModalOpen(false);
+                  openReceiptModal();
+                }}
+                className="w-full py-1.5 px-3 text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                View Reservation Ticket (Forgot PIN?)
               </button>
             </div>
           </div>

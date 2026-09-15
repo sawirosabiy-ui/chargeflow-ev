@@ -14,7 +14,9 @@ import {
   ExternalLink,
   Layers,
   Volume2,
-  VolumeX
+  VolumeX,
+  KeyRound,
+  Timer
 } from 'lucide-react';
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 
@@ -307,6 +309,8 @@ export const ReservationReceiptModal: React.FC = () => {
     slotTime,
     queuePosition,
     estimatedEnergyCostEtb,
+    authCode,
+    authCodeExpiresAt,
   } = receiptModal;
 
   const activeResId = reservationId || reservation?.id || `RES-${receiptNo.slice(-4)}`;
@@ -315,6 +319,9 @@ export const ReservationReceiptModal: React.FC = () => {
   const activeSlot = slotTime || reservation?.slotTime || '18:00 - 18:30';
   const activeQueue = queuePosition ?? reservation?.queuePosition;
   const estimatedCost = estimatedEnergyCostEtb || 360;
+  const activePin = authCode || reservation?.authCode || '8492';
+  const activeExpiresAt = authCodeExpiresAt || reservation?.authCodeExpiresAt || (Date.now() + 60 * 60 * 1000);
+  const expiresTimeString = new Date(activeExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const handleGoToLiveSession = () => {
     handleClose();
@@ -576,6 +583,42 @@ export const ReservationReceiptModal: React.FC = () => {
 
                 <div className="text-[9px] text-slate-400 font-sans leading-tight pl-1">
                   * Note: The 50 ETB reservation fee does not cover electricity. Actual energy consumed is billed separately after charging stops.
+                </div>
+              </div>
+
+              {/* ========================================================================= */}
+              {/* 3.5 4-DIGIT DISPENSER UNLOCK PIN (VALID FOR 1 HOUR)                      */}
+              {/* ========================================================================= */}
+              <div className="pt-2">
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-b from-teal-500/15 via-emerald-500/10 to-teal-500/5 border-2 border-teal-400/40 shadow-[0_0_25px_rgba(45,212,191,0.2)] text-center space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-teal-400" />
+                      DISPENSER UNLOCK PIN
+                    </span>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-300 border border-teal-400/30 font-bold flex items-center gap-1">
+                      <Timer className="w-3 h-3 text-teal-300" />
+                      VALID 1 HR (UNTIL {expiresTimeString})
+                    </span>
+                  </div>
+
+                  {/* 4 Digit Futuristic Monospace PIN Boxes */}
+                  <div className="flex items-center justify-center gap-2.5 sm:gap-3 py-1">
+                    {activePin.split('').slice(0, 4).map((digit, idx) => (
+                      <div
+                        key={idx}
+                        className="w-11 h-13 sm:w-12 sm:h-14 rounded-xl bg-[#090F1C] border-2 border-teal-400/60 shadow-[inset_0_0_15px_rgba(45,212,191,0.3)] flex items-center justify-center"
+                      >
+                        <span className="font-mono text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-teal-200 to-emerald-400 tracking-wider">
+                          {digit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-[10px] text-slate-300 font-sans leading-tight">
+                    Enter this 4-digit PIN at charger dispenser or tap <strong className="text-teal-300">START CHARGING</strong> in Live Session. Code expires in 1 hour.
+                  </p>
                 </div>
               </div>
 

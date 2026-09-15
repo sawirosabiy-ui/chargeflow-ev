@@ -19,6 +19,7 @@ import {
   isBayOccupiedOrReserved,
   getBayQueueCount,
   promoteNextInQueue,
+  validateReservationAuthCode,
 } from '../data/db';
 
 export interface PaymentMethodItem {
@@ -70,6 +71,8 @@ export interface ChargeFlowState {
     queuePosition?: number | null;
     estimatedEnergyCostEtb?: number;
     initialAnimation?: boolean;
+    authCode?: string;
+    authCodeExpiresAt?: number;
   } | null;
   openReceiptModal: (data?: any) => void;
   closeReceiptModal: () => void;
@@ -179,6 +182,8 @@ export interface ChargeFlowState {
     queuePosition?: number;
     arrivalDeadlineMin: number;
     pinConfirmed: boolean;
+    authCode?: string;
+    authCodeExpiresAt?: number;
   } | null;
 
   // Charging Session Engine
@@ -249,7 +254,8 @@ export interface ChargeFlowState {
   settleChargingPayment: (paymentMethod?: string) => { success: boolean; error?: string };
   setReadyToCharge: () => void;
   cancelActiveReservation: () => void;
-  startChargingSession: () => boolean;
+  startChargingSession: (pin?: string) => boolean;
+  verifyAndStartCharging: (pin: string) => { success: boolean; error?: string };
   pauseChargingSession: () => void;
   resumeChargingSession: () => void;
   stopChargingSession: () => void;
@@ -303,8 +309,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       openReceiptModal: (data) =>
         set((state) => {
           if (data) return { receiptModal: { ...data, isOpen: true } };
-          const res = state.reservation;
+          const res = state.reservation || (state.user.id ? getUserActiveReservation(state.user.id) : null);
           const v = state.vehicle;
+          const authCode = res?.authCode || '8492';
+          const authCodeExpiresAt = res?.authCodeExpiresAt || (Date.now() + 60 * 60 * 1000);
           return {
             receiptModal: {
               isOpen: true,
@@ -315,7 +323,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               powerKw: 120,
               amountEtb: res?.depositEtb || 50.0,
               status: 'PAID',
-              qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${res?.id || 'RES-01'}|PAID`,
+              qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${res?.id || 'RES-01'}|PIN:${authCode}|PAID`,
               reservationId: res?.id || 'RES-01',
               vehicleModel: v.model,
               vehiclePlate: v.plate || 'ET-3-A48291',
@@ -323,6 +331,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               queuePosition: res?.queuePosition,
               estimatedEnergyCostEtb: Math.round(18.5 * 19.50),
               initialAnimation: false,
+              authCode,
+              authCodeExpiresAt,
             },
           };
         }),
@@ -730,6 +740,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         const isOccupied = isBayOccupiedOrReserved(station.id, bay.id, userId);
         const queueCount = getBayQueueCount(station.id, bay.id);
 
+        // Generate unique 4-digit dispenser unlock PIN (valid for exactly 1 hour)
+        const authCode = Math.floor(1000 + Math.random() * 9000).toString();
+        const authCodeExpiresAt = Date.now() + 60 * 60 * 1000;
+
         const newReservation: DbReservation = isOccupied
           ? {
               id: `RES-${Date.now().toString().slice(-4)}`,
@@ -744,8 +758,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               status: 'QUEUED',
               queuePosition: queueCount + 1,
               arrivalDeadlineMin: 15,
-              pinConfirmed: true,
+              pinConfirmed: false,
               createdAt: Date.now(),
+              authCode,
+              authCodeExpiresAt,
             }
           : {
               id: `RES-${Date.now().toString().slice(-4)}`,
@@ -759,8 +775,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               date,
               status: 'RESERVED',
               arrivalDeadlineMin: 15,
-              pinConfirmed: true,
+              pinConfirmed: false,
               createdAt: Date.now(),
+              authCode,
+              authCodeExpiresAt,
             };
 
         saveUserReservation(userId, newReservation);
@@ -775,7 +793,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           powerKw: bay.powerKw || 120,
           amountEtb: depositFee,
           status: 'PAID',
-          qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${newReservation.id}|STN:${station.id}|BAY:${bay.id}|PAID`,
+          qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${newReservation.id}|PIN:${authCode}|STN:${station.id}|BAY:${bay.id}|PAID`,
           reservationId: newReservation.id,
           vehicleModel: get().vehicle.model,
           vehiclePlate: get().vehicle.plate || 'ET-3-A48291',
@@ -783,6 +801,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           queuePosition: newReservation.queuePosition,
           estimatedEnergyCostEtb: Math.round(18.5 * 19.50),
           initialAnimation: true,
+          authCode,
+          authCodeExpiresAt,
         };
 
         set({
@@ -828,40 +848,58 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         });
       },
 
-      // CHARGING STATE MACHINE (Strict Authorization Enforcement)
-      startChargingSession: () => {
+      // VERIFY 4-DIGIT PIN & START CHARGING (Enforces 1-hour code validity)
+      verifyAndStartCharging: (pin: string) => {
         const isAuth = get().requireAuth();
-        if (!isAuth) return false;
+        if (!isAuth) return { success: false, error: 'NOT_AUTHENTICATED' };
 
-        const res = get().reservation;
-        const currentStation =
-          get().stations.find((s) => s.id === get().selectedStationId) || get().stations[0];
-        const bayName = res?.bayNumber || 'Bay 03';
+        const userId = get().user.id || 'usr-default';
+        const res = get().reservation || (userId ? getUserActiveReservation(userId) : null);
 
-        // STRICT AUTHORIZATION CHECK:
-        // A charging session may ONLY start if:
-        // - The user has an active confirmed reservation for that exact charger
-        // - OR the user is NEXT_IN_QUEUE and assigned to the charger
-        const isAuthorized =
-          res !== null &&
-          (res.status === 'RESERVED' ||
-            res.status === 'READY_TO_CHARGE' ||
-            res.status === 'NEXT_IN_QUEUE');
-
-        if (!isAuthorized) {
-          // Block action & trigger unauthorized alert modal
+        if (!res) {
+          const currentStation =
+            get().stations.find((s) => s.id === get().selectedStationId) || get().stations[0];
           set({
             unauthorizedModal: {
               isOpen: true,
-              bayName,
+              bayName: 'Bay 03',
               stationName: currentStation.name,
             },
           });
-          return false;
+          return { success: false, error: 'NO_RESERVATION' };
         }
 
-        const userId = get().user.id;
+        // Enforce 1-hour expiration check
+        if (res.authCodeExpiresAt && Date.now() > res.authCodeExpiresAt) {
+          return { success: false, error: 'EXPIRED' };
+        }
+
+        // Validate 4-digit PIN match
+        if (res.authCode && res.authCode.trim() !== pin.trim()) {
+          return { success: false, error: 'INVALID_PIN' };
+        }
+
+        // PIN is valid! Authorize and start charging session
         updateReservationStatus(userId, 'CHARGING');
+        const updatedRes: DbReservation = {
+          id: res.id || `RES-${Date.now().toString().slice(-4)}`,
+          userId,
+          stationId: res.stationId || 'addis-ev-hub-bole',
+          stationName: res.stationName,
+          bayId: res.bayId || 'bay-03',
+          bayNumber: res.bayNumber,
+          depositEtb: res.depositEtb || 50,
+          slotTime: res.slotTime || '18:00 - 18:30',
+          date: res.date || 'Today',
+          status: 'CHARGING',
+          queuePosition: res.queuePosition,
+          arrivalDeadlineMin: res.arrivalDeadlineMin || 15,
+          pinConfirmed: true,
+          createdAt: Date.now(),
+          authCode: res.authCode,
+          authCodeExpiresAt: res.authCodeExpiresAt,
+        };
+        saveUserReservation(userId, updatedRes);
 
         set((state) => {
           const currentSoc = state.vehicle.batterySoc || 38;
@@ -885,9 +923,98 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               battery: resetSoc,
               chargingPower: 148,
             },
-            reservation: state.reservation
-              ? { ...state.reservation, status: 'CHARGING' }
-              : null,
+            reservation: updatedRes,
+            currentView: 'charging',
+          };
+        });
+
+        return { success: true };
+      },
+
+      // CHARGING STATE MACHINE (Strict Authorization Enforcement)
+      startChargingSession: (pin?: string) => {
+        if (pin) {
+          const result = get().verifyAndStartCharging(pin);
+          return result.success;
+        }
+
+        const isAuth = get().requireAuth();
+        if (!isAuth) return false;
+
+        const userId = get().user.id || 'usr-default';
+        const res = get().reservation || (userId ? getUserActiveReservation(userId) : null);
+        const currentStation =
+          get().stations.find((s) => s.id === get().selectedStationId) || get().stations[0];
+        const bayName = res?.bayNumber || 'Bay 03';
+
+        // STRICT AUTHORIZATION CHECK:
+        // A charging session may ONLY start if:
+        // - The user has an active confirmed reservation for that exact charger
+        // - OR the user is NEXT_IN_QUEUE and assigned to the charger
+        // - OR already in CHARGING state
+        const isAuthorized =
+          res !== null &&
+          (res.status === 'RESERVED' ||
+            res.status === 'READY_TO_CHARGE' ||
+            res.status === 'NEXT_IN_QUEUE' ||
+            res.status === 'CHARGING');
+
+        if (!isAuthorized) {
+          // Block action & trigger unauthorized alert modal
+          set({
+            unauthorizedModal: {
+              isOpen: true,
+              bayName,
+              stationName: currentStation.name,
+            },
+          });
+          return false;
+        }
+
+        updateReservationStatus(userId, 'CHARGING');
+        const updatedRes: DbReservation = {
+          id: res.id || `RES-${Date.now().toString().slice(-4)}`,
+          userId,
+          stationId: res.stationId || 'addis-ev-hub-bole',
+          stationName: res.stationName,
+          bayId: res.bayId || 'bay-03',
+          bayNumber: res.bayNumber,
+          depositEtb: res.depositEtb || 50,
+          slotTime: res.slotTime || '18:00 - 18:30',
+          date: res.date || 'Today',
+          status: 'CHARGING',
+          queuePosition: res.queuePosition,
+          arrivalDeadlineMin: res.arrivalDeadlineMin || 15,
+          pinConfirmed: res.pinConfirmed ?? true,
+          createdAt: Date.now(),
+          authCode: res.authCode,
+          authCodeExpiresAt: res.authCodeExpiresAt,
+        };
+        saveUserReservation(userId, updatedRes);
+
+        set((state) => {
+          const currentSoc = state.vehicle.batterySoc || 38;
+          const resetSoc = currentSoc >= 100 ? 38 : currentSoc;
+          return {
+            chargingSession: {
+              ...state.chargingSession,
+              status: 'CHARGING',
+              powerKw: 148,
+              energyDeliveredKwh: 0,
+              totalCostEtb: 0,
+              elapsedSeconds: 0,
+            },
+            vehicle: {
+              ...state.vehicle,
+              batterySoc: resetSoc,
+            },
+            cockpitCharging: {
+              ...state.cockpitCharging,
+              status: 'charging',
+              battery: resetSoc,
+              chargingPower: 148,
+            },
+            reservation: updatedRes,
             currentView: 'charging',
           };
         });
