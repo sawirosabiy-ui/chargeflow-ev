@@ -63,6 +63,13 @@ export interface ChargeFlowState {
     amountEtb: number;
     status: string;
     qrData: string;
+    reservationId?: string;
+    vehicleModel?: string;
+    vehiclePlate?: string;
+    slotTime?: string;
+    queuePosition?: number | null;
+    estimatedEnergyCostEtb?: number;
+    initialAnimation?: boolean;
   } | null;
   openReceiptModal: (data?: any) => void;
   closeReceiptModal: () => void;
@@ -297,17 +304,25 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         set((state) => {
           if (data) return { receiptModal: { ...data, isOpen: true } };
           const res = state.reservation;
+          const v = state.vehicle;
           return {
             receiptModal: {
               isOpen: true,
               receiptNo: `CF-${Date.now().toString().slice(-8)}`,
-              date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
-              stationName: res?.stationName || 'Addis EV Hub',
-              bayNumber: res?.bayNumber || 'DC-03',
+              date: res?.date || new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+              stationName: res?.stationName || 'Addis EV Hub (Bole)',
+              bayNumber: res?.bayNumber || 'Bay 03',
               powerKw: 120,
-              amountEtb: 50.0,
+              amountEtb: res?.depositEtb || 50.0,
               status: 'PAID',
               qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${res?.id || 'RES-01'}|PAID`,
+              reservationId: res?.id || 'RES-01',
+              vehicleModel: v.model,
+              vehiclePlate: v.plate || 'ET-3-A48291',
+              slotTime: res?.slotTime || '18:00 - 18:30',
+              queuePosition: res?.queuePosition,
+              estimatedEnergyCostEtb: Math.round(18.5 * 19.50),
+              initialAnimation: false,
             },
           };
         }),
@@ -761,6 +776,13 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           amountEtb: depositFee,
           status: 'PAID',
           qrData: `CHARGEFLOW|REC:CF-${Date.now().toString().slice(-8)}|RES:${newReservation.id}|STN:${station.id}|BAY:${bay.id}|PAID`,
+          reservationId: newReservation.id,
+          vehicleModel: get().vehicle.model,
+          vehiclePlate: get().vehicle.plate || 'ET-3-A48291',
+          slotTime: newReservation.slotTime,
+          queuePosition: newReservation.queuePosition,
+          estimatedEnergyCostEtb: Math.round(18.5 * 19.50),
+          initialAnimation: true,
         };
 
         set({

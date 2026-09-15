@@ -109,6 +109,7 @@ export const ReservationView: React.FC = () => {
   // PIN modal state
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const dates = [
     { id: 'Today, May 16', label: 'Today', sub: 'May 16' },
@@ -128,13 +129,16 @@ export const ReservationView: React.FC = () => {
   ];
 
   const handlePinInput = (digit: string) => {
+    if (isProcessingPayment) return;
     if (pin.length < 4) {
       const nextPin = pin + digit;
       setPin(nextPin);
       if (nextPin.length === 4) {
+        setIsProcessingPayment(true);
         const bayId = selectedBay.toLowerCase().replace(/\s+/g, '-');
         setTimeout(() => {
           const res = confirmReservation('addis-ev-hub-bole', bayId, selectedTimeSlot, selectedDate);
+          setIsProcessingPayment(false);
           if (res.success) {
             setShowPinModal(false);
             setPin('');
@@ -142,12 +146,13 @@ export const ReservationView: React.FC = () => {
           } else {
             setReservationError(res.error || 'Failed to complete reservation');
           }
-        }, 300);
+        }, 350);
       }
     }
   };
 
   const handleConfirmReservationClick = () => {
+    if (isProcessingPayment) return;
     if (!user.isAuthenticated) {
       openAuthModal('signup');
       return;
@@ -161,6 +166,7 @@ export const ReservationView: React.FC = () => {
   };
 
   const handleDeletePin = () => {
+    if (isProcessingPayment) return;
     setPin(pin.slice(0, -1));
   };
 
@@ -1022,17 +1028,30 @@ export const ReservationView: React.FC = () => {
               ))}
             </div>
 
+            {isProcessingPayment && (
+              <div className="text-center text-xs font-mono text-teal-400 animate-pulse flex items-center justify-center gap-1.5 py-1">
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping"></span>
+                <span>Authorizing 50 ETB & Securing Bay...</span>
+              </div>
+            )}
+
             {/* Numeric Keypad */}
             <div className="grid grid-cols-3 gap-2 text-sm font-mono">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
                 <button
                   key={k}
+                  disabled={isProcessingPayment}
                   onClick={() => {
+                    if (isProcessingPayment) return;
                     if (k === 'C') setPin('');
                     else if (k === '⌫') handleDeletePin();
                     else handlePinInput(k);
                   }}
-                  className="py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-white/5 hover:border-emerald-500/30 text-white font-bold transition-all active:scale-95"
+                  className={`py-3.5 rounded-2xl border text-white font-bold transition-all ${
+                    isProcessingPayment
+                      ? 'opacity-40 cursor-not-allowed bg-slate-900/50 border-white/5'
+                      : 'bg-slate-900 hover:bg-slate-800 border-white/5 hover:border-emerald-500/30 active:scale-95 cursor-pointer'
+                  }`}
                 >
                   {k}
                 </button>
@@ -1040,12 +1059,16 @@ export const ReservationView: React.FC = () => {
             </div>
 
             <button
+              disabled={isProcessingPayment}
               onClick={() => {
+                if (isProcessingPayment) return;
                 setShowPinModal(false);
                 setPin('');
                 setReservationError('Reservation not completed. Payment was cancelled.');
               }}
-              className="w-full py-2 text-xs text-slate-400 hover:text-white text-center transition-colors cursor-pointer"
+              className={`w-full py-2 text-xs transition-colors ${
+                isProcessingPayment ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-white cursor-pointer'
+              }`}
             >
               {t.cancel}
             </button>

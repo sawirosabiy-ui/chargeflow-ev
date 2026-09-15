@@ -106,3 +106,88 @@
     box-shadow: 0 0 25px rgba(52, 211, 153, 0.8), inset 0 0 14px rgba(52, 211, 153, 0.6);
   }
 }
+
+/* Digital Charging Reservation Ticket Feed & Emitter Animations */
+@keyframes ticketFeedUp {
+  0% {
+    transform: translateY(105%);
+    opacity: 0.2;
+  }
+  22% {
+    transform: translateY(74%);
+    opacity: 0.85;
+  }
+  24% {
+    transform: translateY(73%);
+  }
+  48% {
+    transform: translateY(46%);
+    opacity: 0.95;
+  }
+  50% {
+    transform: translateY(45%);
+  }
+  74% {
+    transform: translateY(18%);
+    opacity: 1;
+  }
+  76% {
+    transform: translateY(17%);
+  }
+  92% {
+    transform: translateY(-1.5%);
+  }
+  100% {
+    transform: translateY(0%);
+    opacity: 1;
+  }
+}
+
+@keyframes laserAperturePulse {
+  0%, 100% {
+    opacity: 0.45;
+    box-shadow: 0 0 10px rgba(45, 212, 191, 0.4);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(45, 212, 191, 0.9), 0 0 35px rgba(16, 185, 129, 0.6);
+  }
+}
+
+@keyframes laserScanSweep {
+  0% {
+    top: 0%;
+    opacity: 0.85;
+  }
+  90% {
+    top: 98%;
+    opacity: 0.6;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.ticket-feed-motion {
+  animation: ticketFeedUp 2.2s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+}
+
+.laser-aperture {
+  animation: laserAperturePulse 1.8s infinite ease-in-out;
+}
+
+.laser-scan-sweep {
+  animation: laserScanSweep 2.2s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-feed-motion {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .laser-scan-sweep {
+    display: none !important;
+  }
+}
