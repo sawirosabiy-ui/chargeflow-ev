@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { AppView, Language, EVStation, ChargingHistoryRecord } from '../types';
 import { MOCK_EV_STATIONS } from '../data/mockStations';
-import { AVAILABLE_CARS, CarSpec } from '../data/cars';
+import { AVAILABLE_CARS, CarSpec, VEHICLE_COLORS, getVehicleColorByHex } from '../data/cars';
 import {
   DbUser,
   DbTransaction,
@@ -20,6 +20,7 @@ import {
   getBayQueueCount,
   promoteNextInQueue,
   validateReservationAuthCode,
+  updateDbUserVehicleColor,
 } from '../data/db';
 
 export interface PaymentMethodItem {
@@ -133,6 +134,7 @@ export interface ChargeFlowState {
     modelPath: string;
     scale: number;
     paintColor: string;
+    carColor?: string;
     isLocked: boolean;
     isPreconditioned: boolean;
     image2D?: string;
@@ -234,6 +236,7 @@ export interface ChargeFlowState {
   loadUserData: (userId: string) => void;
   updateUserProfile: (profile: Partial<{ name: string; email: string; phone: string; avatarUrl: string }>) => void;
   selectCar: (car: CarSpec) => void;
+  setVehicleColor: (paintColor: string, carColor?: string) => void;
   updateUserBatterySoc: (soc: number) => void;
   toggleNotificationSetting: (key: keyof ChargeFlowState['notifications']) => void;
   setDefaultPaymentMethod: (id: string) => void;
@@ -382,7 +385,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         acceleration: AVAILABLE_CARS[0].acceleration,
         modelPath: AVAILABLE_CARS[0].modelPath,
         scale: AVAILABLE_CARS[0].scale,
-        paintColor: '#CBD5E1',
+        paintColor: '#0284C7',
+        carColor: 'Blue',
         isLocked: true,
         isPreconditioned: false,
       },
@@ -553,6 +557,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               modelPath: chosenCar.modelPath,
               scale: chosenCar.scale,
               batterySoc,
+              paintColor: dbUser.paintColor || chosenCar.paintColor || '#0284C7',
+              carColor: dbUser.vehicleColor || (dbUser.paintColor ? getVehicleColorByHex(dbUser.paintColor).name : 'Blue'),
             },
             cockpitCharging: {
               ...state.cockpitCharging,
@@ -643,6 +649,23 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             scale: car.scale,
           },
         })),
+
+      setVehicleColor: (paintColor, carColor) =>
+        set((state) => {
+          const colorObj = getVehicleColorByHex(paintColor);
+          const colorName = carColor || colorObj.name;
+          const userId = state.user.id;
+          if (userId) {
+            updateDbUserVehicleColor(userId, paintColor, colorName);
+          }
+          return {
+            vehicle: {
+              ...state.vehicle,
+              paintColor,
+              carColor: colorName,
+            },
+          };
+        }),
 
       updateUserBatterySoc: (soc) =>
         set((state) => ({

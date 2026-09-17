@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RotateCw } from 'lucide-react';
@@ -8,6 +8,7 @@ import { ChargingEnvironment } from './canvas/charging-bay';
 
 interface ShowroomStageProps {
   selectedCar: CarSpec;
+  paintColor?: string;
   autoRotate?: boolean;
   className?: string;
   hideTitle?: boolean;
@@ -30,6 +31,7 @@ const ResponsiveCamera: React.FC<{
 
 export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
   selectedCar = AVAILABLE_CARS[0],
+  paintColor,
   autoRotate: propAutoRotate = false,
   className = 'w-full h-full',
   hideTitle = false,
@@ -56,42 +58,33 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isMobile = viewport.width < 640;
-  const aspect = viewport.width / (viewport.height || 1);
-
-  // Hero car camera framing: Car is larger, closer, and clearly fills the frame
-  let cameraZ = isMobile ? 4.1 : 4.2;
-  let cameraY = isMobile ? 0.36 : 0.38;
-  let baseFov = isMobile ? 38 : 34;
-  let stageScale = isMobile ? 1.45 : 1.35;
-  let stageY = isMobile ? -0.58 : -0.56;
-
-  const cameraPosition: [number, number, number] = [0.0, cameraY, cameraZ];
-  const cameraFov = baseFov;
+  const cameraConfig = useMemo(() => {
+    const w = viewport.width;
+    if (w < 640) {
+      return { position: [0.75, 1.45, 4.4] as [number, number, number], fov: 46 };
+    }
+    if (w < 1024) {
+      return { position: [1.2, 1.6, 4.7] as [number, number, number], fov: 41 };
+    }
+    return { position: [1.5, 1.65, 4.8] as [number, number, number], fov: 38 };
+  }, [viewport.width]);
 
   return (
-    <div className={`relative ${className} select-none cursor-grab active:cursor-grabbing w-full h-full touch-none`}>
+    <div className={`relative ${className} select-none overflow-hidden touch-none`}>
       <Canvas
-        camera={{ position: cameraPosition, fov: cameraFov, near: 0.1, far: 100 }}
-        dpr={[1, 1.5]}
-        frameloop="always"
-        performance={{ min: 0.5 }}
+        className="w-full h-full cursor-grab active:cursor-grabbing"
         gl={{
           antialias: true,
-          powerPreference: 'high-performance',
           alpha: true,
-          stencil: false,
-          depth: true,
+          powerPreference: 'high-performance',
         }}
-        className="w-full h-full"
+        shadows
       >
-        <ResponsiveCamera position={cameraPosition} fov={cameraFov} />
+        <ResponsiveCamera position={cameraConfig.position} fov={cameraConfig.fov} />
 
-        {/* Stationary Stage / Ground Pad with Car-Only 360 Rotation */}
-        <group position={[0, stageY, 0]} scale={stageScale}>
+        <group position={[0, -0.42, 0]}>
           <ChargingEnvironment
-            isCharging={false}
-            batterySoc={75}
+            batterySoc={60}
             theme="dark"
             groundingOffset={-0.002}
             showEnergy={false}
@@ -102,11 +95,11 @@ export const ShowroomStage: React.FC<ShowroomStageProps> = React.memo(({
             onUserInteraction={() => setInteractiveAutoRotate(false)}
           >
             <VehicleStage
-              key={selectedCar.id}
+              key={`${selectedCar.id}-${paintColor || selectedCar.paintColor || ''}`}
               vehicleId={selectedCar.id}
               modelPath={selectedCar.modelPath}
               scale={2.55}
-              paintColor={selectedCar.paintColor || '#2DD4BF'}
+              paintColor={paintColor || selectedCar.paintColor || '#2DD4BF'}
               isCharging={false}
               showChargingPort={false}
             />

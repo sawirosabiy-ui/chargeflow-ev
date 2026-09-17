@@ -88,7 +88,7 @@ export const Cockpit3DStage: React.FC<Cockpit3DStageProps> = React.memo(({
             onUserInteraction={() => setInteractiveAutoRotate(false)}
           >
             <VehicleStage
-              key={vehicle.id}
+              key={`${vehicle.id}-${vehicle.paintColor || '#0284c7'}`}
               vehicleId={vehicle.id}
               modelPath={activeModelPath}
               scale={2.55}

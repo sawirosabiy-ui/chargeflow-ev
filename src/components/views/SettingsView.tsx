@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useChargeFlowStore, PaymentMethodItem } from '../../store/useChargeFlowStore';
 import { useTranslation } from '../../localization/useTranslation';
-import { AVAILABLE_CARS, CarSpec } from '../../data/cars';
+import { AVAILABLE_CARS, CarSpec, VEHICLE_COLORS, getVehicleColorByHex } from '../../data/cars';
 import { Language } from '../../types';
 import { VehicleCutout } from '../vehicle/VehicleCutout';
 
@@ -41,6 +41,7 @@ export const SettingsView: React.FC = () => {
   const language = useChargeFlowStore((s) => s.language);
   const setLanguage = useChargeFlowStore((s) => s.setLanguage);
   const selectCar = useChargeFlowStore((s) => s.selectCar);
+  const setVehicleColor = useChargeFlowStore((s) => s.setVehicleColor);
   const updateUserProfile = useChargeFlowStore((s) => s.updateUserProfile);
   const notifications = useChargeFlowStore((s) => s.notifications);
   const toggleNotificationSetting = useChargeFlowStore((s) => s.toggleNotificationSetting);
@@ -320,6 +321,16 @@ export const SettingsView: React.FC = () => {
                         <span className={`font-sans ${isCream ? "text-stone-500" : "text-slate-400"}`}>{t.licensePlate}</span>
                         <span className="font-bold text-white">{vehicle.plate}</span>
                       </div>
+                      <div className={`p-3 rounded-2xl ${isCream ? "bg-stone-100 text-stone-900" : "bg-[#131A29]"} flex items-center justify-between`}>
+                        <span className={`font-sans ${isCream ? "text-stone-500" : "text-slate-400"}`}>Exterior Color</span>
+                        <div className="flex items-center gap-2 font-bold text-white">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full inline-block shadow-sm"
+                            style={{ backgroundColor: vehicle.paintColor || '#0284C7' }}
+                          />
+                          <span>{getVehicleColorByHex(vehicle.paintColor).name}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -347,6 +358,59 @@ export const SettingsView: React.FC = () => {
                         <div className="text-[9px] text-slate-400">Service</div>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Car Color & Exterior Finish Swatch Selector */}
+                <div className={`p-4 rounded-2xl border ${isCream ? "bg-stone-100/90 border-stone-200" : "bg-[#131A29] border-white/5"} space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className={`text-xs font-bold uppercase tracking-wider ${isCream ? "text-stone-800" : "text-slate-200"}`}>
+                        Car Color & Exterior Finish
+                      </div>
+                      <div className={`text-[11px] ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                        Change the exterior paint of your connected 3D vehicle
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-mono font-bold">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full inline-block shadow-sm"
+                        style={{ backgroundColor: vehicle.paintColor || '#0284C7' }}
+                      />
+                      <span>{getVehicleColorByHex(vehicle.paintColor).name}</span>
+                    </div>
+                  </div>
+
+                  {/* 7 Circular Swatches */}
+                  <div className="flex items-center justify-start gap-2.5 sm:gap-3 pt-1 overflow-x-auto pb-1">
+                    {VEHICLE_COLORS.map((color) => {
+                      const isSelected = (vehicle.paintColor || '#0284C7').toLowerCase() === color.hex.toLowerCase();
+                      const isLight = color.id === 'white' || color.id === 'silver';
+                      return (
+                        <button
+                          key={color.id}
+                          type="button"
+                          onClick={() => setVehicleColor(color.hex, color.name)}
+                          title={`${color.name} (${color.hex})`}
+                          className={`relative w-8 h-8 sm:w-9 sm:h-9 rounded-full transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? 'scale-110 ring-2 ring-teal-400 ring-offset-2 shadow-[0_0_14px_rgba(45,212,191,0.6)]'
+                              : 'hover:scale-105 opacity-80 hover:opacity-100'
+                          } ${isCream ? 'ring-offset-white' : 'ring-offset-[#131A29]'}`}
+                          style={{
+                            backgroundColor: color.hex,
+                            border: `1px solid ${color.borderHex || 'rgba(255,255,255,0.2)'}`,
+                          }}
+                        >
+                          {isSelected && (
+                            <Check
+                              className={`w-4 h-4 ${isLight ? 'text-slate-950' : 'text-white'}`}
+                              strokeWidth={3}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

@@ -14,7 +14,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useChargeFlowStore } from "../../store/useChargeFlowStore";
-import { AVAILABLE_CARS, CarSpec } from "../../data/cars";
+import { AVAILABLE_CARS, CarSpec, VEHICLE_COLORS, getVehicleColorByHex } from "../../data/cars";
 import { useTranslation } from "../../localization/useTranslation";
 import { getBatteryVisualState } from "../../utils/batteryVisualState";
 import { findDbUserByIdentifier, saveDbUser, DbUser } from "../../data/db";
@@ -25,7 +25,10 @@ export const AuthModal: React.FC = () => {
     authModalMode, 
     closeAuthModal, 
     loginUser, 
-    theme 
+    theme,
+    vehicle,
+    selectCar,
+    setVehicleColor,
   } = useChargeFlowStore();
 
   const { t } = useTranslation();
@@ -53,9 +56,23 @@ export const AuthModal: React.FC = () => {
   const [phone, setPhone] = useState("+251 9");
   const [password, setPassword] = useState("");
   const [selectedCarId, setSelectedCarId] = useState("byd-atto-3");
+  const [selectedColorHex, setSelectedColorHex] = useState(vehicle.paintColor || VEHICLE_COLORS[0].hex);
   const [batterySoc, setBatterySoc] = useState(38);
   const [signUpError, setSignUpError] = useState("");
   const [carDropdownOpen, setCarDropdownOpen] = useState(false);
+
+  // Synchronize color when opening modal
+  React.useEffect(() => {
+    if (isAuthModalOpen && vehicle.paintColor) {
+      setSelectedColorHex(vehicle.paintColor);
+    }
+  }, [isAuthModalOpen, vehicle.paintColor]);
+
+  const handleColorSelect = (hex: string) => {
+    setSelectedColorHex(hex);
+    const colorObj = getVehicleColorByHex(hex);
+    setVehicleColor(hex, colorObj.name);
+  };
 
   if (!isAuthModalOpen) return null;
 
@@ -113,12 +130,15 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
+    const colorObj = getVehicleColorByHex(selectedColorHex);
     const newUser: DbUser = {
       id: `USR-${Date.now().toString().slice(-6)}`,
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       vehicleId: selectedCarId,
+      vehicleColor: colorObj.name,
+      paintColor: colorObj.hex,
       batterySoc,
       createdAt: new Date().toISOString(),
     };
@@ -414,6 +434,7 @@ export const AuthModal: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setSelectedCarId(car.id);
+                            selectCar(car);
                             setCarDropdownOpen(false);
                           }}
                           className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2.5 transition-all cursor-pointer ${
@@ -443,6 +464,54 @@ export const AuthModal: React.FC = () => {
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Car Color Swatches */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <label className={`block text-[11px] font-bold uppercase tracking-wider ${isCream ? "text-stone-700" : "text-slate-300"}`}>
+                  Car Color
+                </label>
+                <span className="text-[11px] font-mono text-teal-400 font-semibold flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full inline-block"
+                    style={{ backgroundColor: selectedColorHex }}
+                  />
+                  {getVehicleColorByHex(selectedColorHex).name}
+                </span>
+              </div>
+              <div className={`flex items-center justify-between gap-1.5 sm:gap-2 p-2 rounded-2xl border backdrop-blur-md ${
+                isCream ? "bg-stone-100/80 border-stone-200" : "bg-black/25 border-white/10"
+              }`}>
+                {VEHICLE_COLORS.map((color) => {
+                  const isSelected = selectedColorHex.toLowerCase() === color.hex.toLowerCase();
+                  const isLightColor = color.id === 'white' || color.id === 'silver';
+                  return (
+                    <button
+                      key={color.id}
+                      type="button"
+                      onClick={() => handleColorSelect(color.hex)}
+                      title={color.name}
+                      className={`relative w-7 h-7 sm:w-8 sm:h-8 rounded-full transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0 ${
+                        isSelected
+                          ? 'scale-110 ring-2 ring-teal-400 ring-offset-2 shadow-[0_0_14px_rgba(45,212,191,0.6)]'
+                          : 'hover:scale-105 opacity-80 hover:opacity-100'
+                      } ${isCream ? 'ring-offset-white' : 'ring-offset-[#090F1C]'}`}
+                      style={{ 
+                        backgroundColor: color.hex,
+                        border: `1px solid ${color.borderHex || 'rgba(255,255,255,0.25)'}`
+                      }}
+                    >
+                      {isSelected && (
+                        <Check
+                          className={`w-3.5 h-3.5 ${isLightColor ? 'text-slate-950' : 'text-white'}`}
+                          strokeWidth={3}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

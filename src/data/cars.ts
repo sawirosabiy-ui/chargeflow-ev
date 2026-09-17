@@ -256,6 +256,33 @@ const RAW_CARS: CarSpec[] = [
 // STRICT ALPHABETICAL ORDER BY NAME
 export const AVAILABLE_CARS: CarSpec[] = [...RAW_CARS].sort((a, b) => a.name.localeCompare(b.name));
 
+export interface VehicleColorOption {
+  id: string;
+  name: string;
+  hex: string;
+  borderHex: string;
+}
+
+export const VEHICLE_COLORS: VehicleColorOption[] = [
+  { id: 'white', name: 'White', hex: '#F8FAFC', borderHex: '#CBD5E1' },
+  { id: 'black', name: 'Black', hex: '#0F172A', borderHex: '#334155' },
+  { id: 'silver', name: 'Silver', hex: '#94A3B8', borderHex: '#64748B' },
+  { id: 'grey', name: 'Grey', hex: '#475569', borderHex: '#64748B' },
+  { id: 'blue', name: 'Blue', hex: '#0284C7', borderHex: '#38BDF8' },
+  { id: 'red', name: 'Red', hex: '#DC2626', borderHex: '#F87171' },
+  { id: 'green', name: 'Green', hex: '#059669', borderHex: '#34D399' },
+];
+
+export const getVehicleColorByHex = (hex?: string): VehicleColorOption => {
+  if (!hex) return VEHICLE_COLORS[0];
+  const clean = hex.toLowerCase();
+  return (
+    VEHICLE_COLORS.find(
+      (c) => c.hex.toLowerCase() === clean || c.id.toLowerCase() === clean || c.name.toLowerCase() === clean
+    ) || VEHICLE_COLORS[0]
+  );
+};
+
 /**
  * Smart car search with fallback reference matching
  * If query doesn't match any car directly, recommends a compatible reference car.

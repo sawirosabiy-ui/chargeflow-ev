@@ -215,7 +215,12 @@ export const Welcome: React.FC = () => {
 
           {/* 3D Canvas Box: Prominent Hero Car (Close-up, crisp, no clutter) */}
           <div className="w-full h-72 sm:h-84 lg:h-[420px] relative flex items-center justify-center -my-2 sm:my-0">
-            <ShowroomStage selectedCar={selectedCar} autoRotate={false} hideTitle={true} />
+            <ShowroomStage 
+              selectedCar={selectedCar} 
+              paintColor={storedVehicle.paintColor || selectedCar.paintColor} 
+              autoRotate={false} 
+              hideTitle={true} 
+            />
           </div>
 
           {/* Live Specs Ribbon (Battery SoC, Est. Range, Powertrain) */}

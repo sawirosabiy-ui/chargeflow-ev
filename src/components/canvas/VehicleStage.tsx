@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo, useRef } from 'react';
+import React, { Suspense, useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF, Center, Text } from '@react-three/drei';
@@ -167,11 +167,124 @@ const DynamicCarModel: React.FC<DynamicCarModelProps> = ({
         const nameLower = (mesh.name || '').toLowerCase();
         const matNameLower = (Array.isArray(mesh.material) ? mesh.material[0]?.name : mesh.material?.name || '').toLowerCase();
 
-        const isChrome = nameLower.includes('chrome') || matNameLower.includes('chrome') || nameLower.includes('trim') || matNameLower.includes('trim');
-        const isGlass = nameLower.includes('glass') || nameLower.includes('window') || matNameLower.includes('glass') || matNameLower.includes('window') || matNameLower.includes('in_glass');
-        const isBody = nameLower.includes('body') || nameLower.includes('paint') || nameLower.includes('hood') || nameLower.includes('door') || matNameLower.includes('carpaint') || matNameLower.includes('body') || matNameLower.includes('paint');
-        const isTailLight = nameLower.includes('tail') || matNameLower.includes('tail') || nameLower.includes('red_glass') || matNameLower.includes('red_glass') || nameLower.includes('back_lines') || matNameLower.includes('back_lines');
-        const isRim = nameLower.includes('rim') || matNameLower.includes('rim') || nameLower.includes('wheel') || matNameLower.includes('wheel');
+        // 1. Tires & Rubber
+        const isTire =
+          nameLower.includes('tire') ||
+          nameLower.includes('tyre') ||
+          nameLower.includes('rubber') ||
+          matNameLower.includes('tire') ||
+          matNameLower.includes('tyre') ||
+          matNameLower.includes('rubber');
+
+        // 2. Wheels / Rims
+        const isRim =
+          !isTire &&
+          (nameLower.includes('rim') ||
+           matNameLower.includes('rim') ||
+           nameLower.includes('wheel') ||
+           matNameLower.includes('wheel') ||
+           matNameLower.includes('spoke') ||
+           nameLower.includes('caliper') ||
+           matNameLower.includes('caliper'));
+
+        // 3. Chrome / Exterior metallic trim
+        const isChrome =
+          !isTire && !isRim &&
+          (nameLower.includes('chrome') ||
+           matNameLower.includes('chrome') ||
+           nameLower.includes('trim') ||
+           matNameLower.includes('trim') ||
+           nameLower.includes('badge') ||
+           matNameLower.includes('badge') ||
+           matNameLower.includes('metal_badges'));
+
+        // 4. Windows & Glass
+        const isGlass =
+          nameLower.includes('glass') ||
+          nameLower.includes('window') ||
+          matNameLower.includes('glass') ||
+          matNameLower.includes('window') ||
+          matNameLower.includes('in_glass') ||
+          nameLower.includes('windshield') ||
+          matNameLower.includes('windshield');
+
+        // 5. Lights (Tail lights and Headlights)
+        const isTailLight =
+          nameLower.includes('tail') ||
+          matNameLower.includes('tail') ||
+          nameLower.includes('red_glass') ||
+          matNameLower.includes('red_glass') ||
+          nameLower.includes('back_lines') ||
+          matNameLower.includes('back_lines');
+
+        const isHeadLight =
+          !isTailLight &&
+          (nameLower.includes('headlight') ||
+           matNameLower.includes('headlight') ||
+           nameLower.includes('chome_hl') ||
+           matNameLower.includes('chome_hl') ||
+           matNameLower.includes('hl_map') ||
+           nameLower.includes('lens') ||
+           matNameLower.includes('lens') ||
+           nameLower.includes('carrometal_farol'));
+
+        // 6. Interior (Dashboard, seats, steering, screens, carpets, leather)
+        const isInterior =
+          nameLower.includes('interior') ||
+          matNameLower.includes('interior') ||
+          nameLower.includes('carpet') ||
+          matNameLower.includes('carpet') ||
+          nameLower.includes('leather') ||
+          matNameLower.includes('leather') ||
+          nameLower.includes('seat') ||
+          matNameLower.includes('seat') ||
+          nameLower.includes('steering') ||
+          matNameLower.includes('steering') ||
+          nameLower.includes('dashboard') ||
+          matNameLower.includes('dashboard') ||
+          nameLower.includes('center_console') ||
+          matNameLower.includes('center_console') ||
+          nameLower.includes('screen') ||
+          matNameLower.includes('screen') ||
+          nameLower.includes('pedal') ||
+          matNameLower.includes('pedal') ||
+          matNameLower.includes('tela_roof');
+
+        // 7. Underbody, Chassis, Grille
+        const isUnderbody =
+          nameLower.includes('under') ||
+          matNameLower.includes('under') ||
+          nameLower.includes('chassis') ||
+          matNameLower.includes('chassis') ||
+          nameLower.includes('exhaust') ||
+          matNameLower.includes('exhaust') ||
+          nameLower.includes('license') ||
+          nameLower.includes('number_plate') ||
+          nameLower.includes('radiator');
+
+        // 8. Exterior Body Paint
+        const isTeslaModelY = vehicleKey.toLowerCase().includes('tesla');
+        const isTeslaBody = isTeslaModelY && (nameLower === 'object_1' || matNameLower.includes('palettematerial002'));
+
+        const isBody =
+          !isGlass &&
+          !isChrome &&
+          !isTailLight &&
+          !isHeadLight &&
+          !isRim &&
+          !isTire &&
+          !isInterior &&
+          !isUnderbody &&
+          (
+            matNameLower.includes('carpaint') ||
+            matNameLower.includes('car_paint') ||
+            nameLower.includes('carpaint') ||
+            nameLower.includes('bodypaint') ||
+            nameLower.includes('cap_paint') ||
+            nameLower.includes('mk_body_carpaint') ||
+            isTeslaBody ||
+            ((nameLower.includes('body') || nameLower.includes('hood') || nameLower.includes('fender') || nameLower.includes('door') || nameLower.includes('trunk')) && !nameLower.includes('interior'))
+          );
 
         if (isTailLight) {
           const baseMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
@@ -201,14 +314,15 @@ const DynamicCarModel: React.FC<DynamicCarModelProps> = ({
           });
         } else if (isBody && paintColor) {
           mesh.material = new THREE.MeshPhysicalMaterial({
-            color: new THREE.Color(paintColor || '#1249BB'),
-            roughness: 0.14,
-            metalness: 0.88,
+            color: new THREE.Color(paintColor || '#0284C7'),
+            roughness: 0.16,
+            metalness: 0.85,
             clearcoat: 1.0,
-            clearcoatRoughness: 0.02,
-            reflectivity: 0.98,
-            envMapIntensity: 2.6,
+            clearcoatRoughness: 0.04,
+            reflectivity: 0.96,
+            envMapIntensity: 2.5,
           });
+          mesh.userData.isBodyPaint = true;
         } else if (isRim) {
           const baseMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
           if (baseMat instanceof THREE.MeshStandardMaterial) {
@@ -222,6 +336,22 @@ const DynamicCarModel: React.FC<DynamicCarModelProps> = ({
 
     return clone;
   }, [scene, scale, vehicleConfig, paintColor]);
+
+  // Real-time instant color update on existing 3D body materials
+  useEffect(() => {
+    if (!processedScene || !paintColor) return;
+    processedScene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        if (mesh.userData?.isBodyPaint && mesh.material) {
+          if (mesh.material instanceof THREE.MeshPhysicalMaterial || mesh.material instanceof THREE.MeshStandardMaterial) {
+            mesh.material.color.set(paintColor);
+            mesh.material.needsUpdate = true;
+          }
+        }
+      }
+    });
+  }, [processedScene, paintColor]);
 
   const isAtto3 = vehicleKey.toLowerCase().includes('atto');
   const isBydBrand = vehicleKey.toLowerCase().includes('byd');

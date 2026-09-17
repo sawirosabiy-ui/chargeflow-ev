@@ -159,6 +159,7 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
               onUserInteraction={onUserInteraction}
             >
               <VehicleStage
+                key={`${vehicle.id}-${vehicle.paintColor || '#0284c7'}`}
                 vehicleId={vehicle.id}
                 modelPath={vehicle.modelPath}
                 scale={2.60}

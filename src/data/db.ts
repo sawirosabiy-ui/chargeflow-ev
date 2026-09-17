@@ -14,6 +14,8 @@ export interface DbUser {
   phone: string;
   hashedSecret?: string;
   vehicleId: string;
+  vehicleColor?: string;
+  paintColor?: string;
   batterySoc?: number;
   dailyCommuteKm?: string;
   chargingHabit?: string;
@@ -271,6 +273,26 @@ export const findDbUserByIdentifier = (identifier: string): DbUser | null => {
   const clean = identifier.trim().toLowerCase();
   const users = getDbUsers();
   return users.find((u) => u.email.toLowerCase() === clean || u.phone.replace(/[\s-]/g, '') === clean.replace(/[\s-]/g, '')) || null;
+};
+
+export const updateDbUserVehicleColor = (
+  userId: string,
+  paintColor: string,
+  vehicleColor?: string
+): void => {
+  try {
+    const users = getDbUsers();
+    const index = users.findIndex((u) => u.id === userId);
+    if (index !== -1) {
+      users[index].paintColor = paintColor;
+      if (vehicleColor) {
+        users[index].vehicleColor = vehicleColor;
+      }
+      localStorage.setItem(DB_USERS_KEY, JSON.stringify(users));
+    }
+  } catch {
+    // Non-fatal
+  }
 };
 
 // ---------------------------------------------------------------------------
