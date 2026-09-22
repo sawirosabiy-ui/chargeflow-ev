@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   CheckCircle2, 
   X, 
@@ -16,9 +16,12 @@ import {
   Volume2,
   VolumeX,
   KeyRound,
-  Timer
+  Timer,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
+import { generateQRCodeSVG } from '../../utils/qrCode';
 
 export const ReservationReceiptModal: React.FC = () => {
   const receiptModal = useChargeFlowStore((s) => s.receiptModal);
@@ -323,6 +326,46 @@ export const ReservationReceiptModal: React.FC = () => {
   const activeExpiresAt = authCodeExpiresAt || reservation?.authCodeExpiresAt || (Date.now() + 60 * 60 * 1000);
   const expiresTimeString = new Date(activeExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  const [copiedPin, setCopiedPin] = useState(false);
+
+  const handleCopyPin = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(activePin);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = activePin;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedPin(true);
+      setTimeout(() => setCopiedPin(false), 2000);
+    } catch (err) {
+      console.error('Copy PIN failed:', err);
+    }
+  };
+
+  const qrCodeUrl = useMemo(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chargeflow-ev.com';
+    return `${origin}/?res=${encodeURIComponent(activeResId)}&station=${encodeURIComponent(stationName)}&bay=${encodeURIComponent(bayNumber)}&amount=${amountEtb}&pin=${encodeURIComponent(activePin)}`;
+  }, [activeResId, stationName, bayNumber, amountEtb, activePin]);
+
+  const qrSvgString = useMemo(() => {
+    try {
+      return generateQRCodeSVG(qrCodeUrl, {
+        padding: 2,
+        fgColor: '#070C18',
+        bgColor: '#FFFFFF',
+        size: 140,
+      });
+    } catch (e) {
+      console.error('QR generation failed:', e);
+      return '';
+    }
+  }, [qrCodeUrl]);
+
   const handleGoToLiveSession = () => {
     handleClose();
     setView('charging');
@@ -591,15 +634,35 @@ export const ReservationReceiptModal: React.FC = () => {
               {/* ========================================================================= */}
               <div className="pt-2">
                 <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-b from-teal-500/15 via-emerald-500/10 to-teal-500/5 border-2 border-teal-400/40 shadow-[0_0_25px_rgba(45,212,191,0.2)] text-center space-y-2.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
                       <KeyRound className="w-3.5 h-3.5 text-teal-400" />
                       DISPENSER UNLOCK PIN
                     </span>
-                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-300 border border-teal-400/30 font-bold flex items-center gap-1">
-                      <Timer className="w-3 h-3 text-teal-300" />
-                      VALID 1 HR (UNTIL {expiresTimeString})
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleCopyPin}
+                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-teal-400/20 hover:bg-teal-400/30 text-teal-300 border border-teal-400/40 text-[9px] font-mono font-bold transition-all active:scale-95 cursor-pointer shadow"
+                        title="Copy 4-digit PIN to clipboard"
+                      >
+                        {copiedPin ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400 stroke-[3]" />
+                            <span className="text-emerald-300">COPIED!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3 text-teal-300" />
+                            <span>COPY PIN</span>
+                          </>
+                        )}
+                      </button>
+                      <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-300 border border-teal-400/30 font-bold flex items-center gap-1">
+                        <Timer className="w-3 h-3 text-teal-300" />
+                        UNTIL {expiresTimeString}
+                      </span>
+                    </div>
                   </div>
 
                   {/* 4 Digit Futuristic Monospace PIN Boxes */}
@@ -622,62 +685,27 @@ export const ReservationReceiptModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* 4. Realistic High-Res Vector SVG QR Code for Attendant & Dispenser Verification */}
-              <div className="pt-2 border-t border-white/10 text-center space-y-1.5">
-                <div className="p-2 bg-white rounded-xl inline-block shadow-inner mx-auto">
-                  <svg className="w-24 h-24 sm:w-28 sm:h-28 mx-auto" viewBox="0 0 100 100" fill="none">
-                    {/* Corner 1 */}
-                    <rect x="6" y="6" width="24" height="24" fill="#090F1C" rx="2" />
-                    <rect x="9" y="9" width="18" height="18" fill="#fff" />
-                    <rect x="13" y="13" width="10" height="10" fill="#090F1C" />
-
-                    {/* Corner 2 */}
-                    <rect x="70" y="6" width="24" height="24" fill="#090F1C" rx="2" />
-                    <rect x="73" y="9" width="18" height="18" fill="#fff" />
-                    <rect x="77" y="13" width="10" height="10" fill="#090F1C" />
-
-                    {/* Corner 3 */}
-                    <rect x="6" y="70" width="24" height="24" fill="#090F1C" rx="2" />
-                    <rect x="9" y="73" width="18" height="18" fill="#fff" />
-                    <rect x="13" y="77" width="10" height="10" fill="#090F1C" />
-
-                    {/* Simulated Data Grid */}
-                    <rect x="36" y="8" width="6" height="6" fill="#090F1C" />
-                    <rect x="46" y="8" width="6" height="6" fill="#090F1C" />
-                    <rect x="56" y="8" width="6" height="6" fill="#090F1C" />
-                    <rect x="36" y="18" width="6" height="6" fill="#090F1C" />
-                    <rect x="48" y="24" width="6" height="6" fill="#090F1C" />
-                    <rect x="8" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="18" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="28" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="38" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="58" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="68" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="78" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="88" y="36" width="6" height="6" fill="#090F1C" />
-                    <rect x="36" y="46" width="6" height="6" fill="#090F1C" />
-                    <rect x="56" y="46" width="6" height="6" fill="#090F1C" />
-                    <rect x="66" y="46" width="6" height="6" fill="#090F1C" />
-                    <rect x="36" y="58" width="6" height="6" fill="#090F1C" />
-                    <rect x="46" y="58" width="6" height="6" fill="#090F1C" />
-                    <rect x="76" y="58" width="6" height="6" fill="#090F1C" />
-                    <rect x="86" y="58" width="6" height="6" fill="#090F1C" />
-                    <rect x="36" y="68" width="6" height="6" fill="#090F1C" />
-                    <rect x="56" y="68" width="6" height="6" fill="#090F1C" />
-                    <rect x="46" y="78" width="6" height="6" fill="#090F1C" />
-                    <rect x="66" y="78" width="6" height="6" fill="#090F1C" />
-                    <rect x="76" y="78" width="6" height="6" fill="#090F1C" />
-                    <rect x="46" y="86" width="6" height="6" fill="#090F1C" />
-                    <rect x="56" y="86" width="6" height="6" fill="#090F1C" />
-                    <rect x="86" y="86" width="6" height="6" fill="#090F1C" />
-
-                    {/* Central Verification Hologram Pill */}
-                    <rect x="42" y="42" width="16" height="16" rx="4" fill="#0D9488" />
-                    <path d="M50 45 L47 51 L50 51 L49 55 L54 49 L51 49 Z" fill="#fff" />
-                  </svg>
+              {/* 4. Realistic Camera-Scannable QR Code for Attendant & Station Verification */}
+              <div className="pt-2 border-t border-white/10 text-center space-y-2">
+                <div className="p-2.5 bg-white rounded-xl inline-block shadow-lg mx-auto">
+                  {qrSvgString ? (
+                    <div
+                      className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+                      dangerouslySetInnerHTML={{ __html: qrSvgString }}
+                    />
+                  ) : (
+                    <div className="w-28 h-28 bg-slate-100 flex items-center justify-center text-slate-500 text-xs">
+                      QR Generated
+                    </div>
+                  )}
                 </div>
-                <div className="text-[9px] text-slate-400 font-sans">
-                  Scan at Bay Dispenser scanner or present to attendant
+                <div className="space-y-1">
+                  <div className="text-[10px] font-mono font-bold text-teal-300 uppercase tracking-wider">
+                    SCAN TO OPEN LIVE SESSION &amp; VERIFY
+                  </div>
+                  <div className="text-[9px] text-slate-400 font-sans max-w-[260px] mx-auto leading-tight">
+                    Scan with any smartphone camera to access station checkout, bay authorization, and unlock status.
+                  </div>
                 </div>
               </div>
             </div>

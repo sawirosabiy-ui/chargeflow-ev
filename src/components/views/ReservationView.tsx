@@ -21,7 +21,8 @@ import {
   Radio,
   Clock,
   Sparkles,
-  Sliders
+  Sliders,
+  AlertCircle
 } from 'lucide-react';
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 import { useTranslation } from '../../localization/useTranslation';
@@ -110,6 +111,8 @@ export const ReservationView: React.FC = () => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showFullBatteryWarning, setShowFullBatteryWarning] = useState(false);
+  const [hasBypassedFullBatteryWarning, setHasBypassedFullBatteryWarning] = useState(false);
 
   const dates = [
     { id: 'Today, May 16', label: 'Today', sub: 'May 16' },
@@ -127,6 +130,10 @@ export const ReservationView: React.FC = () => {
     '19:00 - 19:30',
     '19:30 - 20:00',
   ];
+
+  const handleSelectBay = (bay: 'Bay 03' | 'Bay 01' | 'Bay 02' | 'Bay 04' | 'Bay 05') => {
+    setSelectedBay(bay);
+  };
 
   const handlePinInput = (digit: string) => {
     if (isProcessingPayment) return;
@@ -161,6 +168,14 @@ export const ReservationView: React.FC = () => {
       setShowTopupModal(true);
       return;
     }
+
+    // Full battery confirmation gate: check if battery is 100% or >= 98%
+    const currentSoc = vehicle.batterySoc ?? 100;
+    if (currentSoc >= 98 && !hasBypassedFullBatteryWarning) {
+      setShowFullBatteryWarning(true);
+      return;
+    }
+
     setReservationError('');
     setShowPinModal(true);
   };
@@ -1072,6 +1087,50 @@ export const ReservationView: React.FC = () => {
             >
               {t.cancel}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Battery Full Warning Gate Modal */}
+      {showFullBatteryWarning && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
+          <div className="bg-[#111827] border border-amber-500/40 rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 shadow-2xl text-center animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]">
+              <AlertCircle className="w-7 h-7 stroke-[2.5]" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-white uppercase tracking-tight">
+                Battery Already Full ({vehicle.batterySoc}%)
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Your <strong className="text-white">{vehicle.brand} {vehicle.model}</strong> battery is currently at <strong className="text-emerald-400">{vehicle.batterySoc}%</strong> charge. High-power DC fast charging cannot deliver fast charge to an already full battery.
+              </p>
+              <p className="text-[11px] text-amber-400 font-medium">
+                Are you sure you want to proceed with reserving {selectedBay}?
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowFullBatteryWarning(false)}
+                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFullBatteryWarning(false);
+                  setHasBypassedFullBatteryWarning(true);
+                  setShowPinModal(true);
+                }}
+                className="py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider transition-all shadow-lg cursor-pointer"
+              >
+                Yes, Reserve
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -23,7 +23,8 @@ import {
   ShieldCheck, 
   X, 
   Delete, 
-  FileText 
+  FileText,
+  ClipboardPaste
 } from "lucide-react";
 
 export const AheChargingCockpit: React.FC = () => {
@@ -112,15 +113,16 @@ export const AheChargingCockpit: React.FC = () => {
 
   // Sync remaining validity seconds for the 1-hour PIN
   useEffect(() => {
-    if (!isPinModalOpen || !activeReservation?.authCodeExpiresAt) return;
+    const expiresAt = activeReservation?.reservationEnd || activeReservation?.authCodeExpiresAt;
+    if (!isPinModalOpen || !expiresAt) return;
     const updateCountdown = () => {
-      const remaining = Math.max(0, Math.floor((activeReservation.authCodeExpiresAt! - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
       setPinRemainingSec(remaining);
     };
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [isPinModalOpen, activeReservation?.authCodeExpiresAt]);
+  }, [isPinModalOpen, activeReservation?.reservationEnd, activeReservation?.authCodeExpiresAt]);
 
   const submitPin = (pinToSubmit: string) => {
     const res = verifyAndStartCharging(pinToSubmit);
@@ -161,6 +163,30 @@ export const AheChargingCockpit: React.FC = () => {
   const handlePinClear = () => {
     setPinError(null);
     setPinInput('');
+  };
+
+  const handlePastePin = async () => {
+    try {
+      let text = '';
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+        text = await navigator.clipboard.readText();
+      }
+      const clean = text.trim().replace(/\D/g, '').slice(0, 4);
+      if (clean.length === 4) {
+        setPinInput(clean);
+        setPinError(null);
+        submitPin(clean);
+        return;
+      }
+    } catch {
+      // ignore clipboard permission error
+    }
+    // Fallback: If user has an active reservation PIN
+    if (activeReservation?.authCode) {
+      setPinInput(activeReservation.authCode);
+      setPinError(null);
+      submitPin(activeReservation.authCode);
+    }
   };
 
   // Physical keyboard support for 4-digit PIN entry
@@ -503,6 +529,19 @@ export const AheChargingCockpit: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Paste / Auto-fill helper */}
+            <div className="flex items-center justify-center">
+              <button
+                type="button"
+                onClick={handlePastePin}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 hover:bg-teal-500/10 border border-white/10 hover:border-teal-400/30 text-teal-400 text-[10px] font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Paste PIN from clipboard or use active reservation PIN"
+              >
+                <ClipboardPaste className="w-3.5 h-3.5" />
+                <span>PASTE / AUTO-FILL PIN</span>
+              </button>
             </div>
 
             {/* Error Message */}

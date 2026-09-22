@@ -62,7 +62,7 @@ export const CockpitView: React.FC = () => {
           </div>
 
           {/* 3D Vehicle Seamless Stage: Blended directly into environment (One Stage, Not Two) */}
-          <div className={`w-full h-[340px] sm:h-[400px] lg:h-[450px] rounded-3xl relative overflow-hidden transition-all duration-300 shadow-2xl ${
+          <div className={`w-full h-[370px] sm:h-[410px] lg:h-[450px] rounded-3xl relative overflow-hidden transition-all duration-300 shadow-2xl ${
             isCream 
               ? "bg-[#EAE4D9] border border-stone-300/70 shadow-stone-300/40" 
               : "bg-[#040711] border border-white/5 shadow-black/80"

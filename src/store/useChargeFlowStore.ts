@@ -41,9 +41,12 @@ export interface ChargeFlowState {
   theme: 'dark' | 'cream';
   completionNotification: {
     show: boolean;
+    type?: 'milestone_90' | 'milestone_100' | 'completed_payment';
+    title?: string;
+    percentage?: number;
     message: string;
-    finalKwh: number;
-    finalCostEtb: number;
+    finalKwh?: number;
+    finalCostEtb?: number;
   } | null;
   isAuthModalOpen: boolean;
   authModalMode: 'signin' | 'signup';
@@ -97,6 +100,12 @@ export interface ChargeFlowState {
     powerKw?: number;
   }) => void;
   closeDirectionsModal: () => void;
+
+  // Expired Reservation Modal (1-Hour Arrival Window System)
+  isReservationExpiredModalOpen: boolean;
+  openReservationExpiredModal: () => void;
+  closeReservationExpiredModal: () => void;
+  checkReservationExpiration: () => boolean;
 
   // Full Screen Map Mode
   isFullScreenMap: boolean;
@@ -180,12 +189,15 @@ export interface ChargeFlowState {
       | 'CHARGING'
       | 'PAYMENT_PENDING'
       | 'COMPLETED'
-      | 'CANCELLED';
+      | 'CANCELLED'
+      | 'EXPIRED';
     queuePosition?: number;
     arrivalDeadlineMin: number;
     pinConfirmed: boolean;
     authCode?: string;
     authCodeExpiresAt?: number;
+    reservationStart?: number;
+    reservationEnd?: number;
   } | null;
 
   // Charging Session Engine
@@ -438,6 +450,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       selectedStationId: null,
       selectedBayId: null,
       reservation: null,
+      isReservationExpiredModalOpen: false,
 
       // Charging Session Engine (Clean state: No fake active charging session)
       chargingSession: {
@@ -482,6 +495,30 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       openAuthModal: (mode = 'signup') => set({ isAuthModalOpen: true, authModalMode: mode }),
       closeAuthModal: () => set({ isAuthModalOpen: false }),
       setPendingIntent: (intent) => set({ pendingIntent: intent }),
+
+      openReservationExpiredModal: () => set({ isReservationExpiredModalOpen: true }),
+      closeReservationExpiredModal: () => set({ isReservationExpiredModalOpen: false }),
+      checkReservationExpiration: () => {
+        const res = get().reservation;
+        if (!res || !res.reservationEnd) return false;
+        if (res.status === 'RESERVED' || res.status === 'QUEUED') {
+          if (Date.now() > res.reservationEnd) {
+            const userId = get().user.id;
+            if (userId && res.id) {
+              updateReservationStatus(userId, 'CANCELLED');
+            }
+            set({
+              reservation: {
+                ...res,
+                status: 'EXPIRED',
+              },
+              isReservationExpiredModalOpen: true,
+            });
+            return true;
+          }
+        }
+        return false;
+      },
 
       requireAuth: (intent) => {
         const isAuth = get().user.isAuthenticated;
@@ -535,6 +572,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
                 queuePosition: activeRes.queuePosition,
                 arrivalDeadlineMin: activeRes.arrivalDeadlineMin,
                 pinConfirmed: activeRes.pinConfirmed,
+                authCode: activeRes.authCode,
+                authCodeExpiresAt: activeRes.authCodeExpiresAt,
+                reservationStart: activeRes.reservationStart,
+                reservationEnd: activeRes.reservationEnd || activeRes.authCodeExpiresAt,
               }
             : null;
 
@@ -785,6 +826,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               createdAt: Date.now(),
               authCode,
               authCodeExpiresAt,
+              reservationStart: Date.now(),
+              reservationEnd: authCodeExpiresAt,
             }
           : {
               id: `RES-${Date.now().toString().slice(-4)}`,
@@ -802,6 +845,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               createdAt: Date.now(),
               authCode,
               authCodeExpiresAt,
+              reservationStart: Date.now(),
+              reservationEnd: authCodeExpiresAt,
             };
 
         saveUserReservation(userId, newReservation);
@@ -1217,6 +1262,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           history: updatedHistory,
           completionNotification: {
             show: true,
+            type: 'completed_payment',
+            title: 'Payment & Session Complete',
             message: `Payment complete: ${finalKwh} kWh delivered (${finalCost} ETB via ${paymentMethod}). Bay ${bayNumber} is now released.`,
             finalKwh,
             finalCostEtb: finalCost,
@@ -1248,10 +1295,29 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           set((state) => ({
             vehicle: { ...state.vehicle, batterySoc: nextSoc },
             cockpitCharging: { ...state.cockpitCharging, battery: nextSoc },
+            completionNotification: {
+              show: true,
+              type: 'milestone_100',
+              title: 'Battery Fully Charged (100%)',
+              percentage: 100,
+              message: 'Your vehicle battery has reached 100% (Full). Charging is complete and ready for departure.',
+            },
           }));
           get().stopChargingSession();
           return;
         }
+
+        // Milestone notification when crossing 90%
+        const isCrossing90 = currentSoc < 90 && nextSoc >= 90;
+        const milestoneNotif = isCrossing90
+          ? {
+              show: true,
+              type: 'milestone_90' as const,
+              title: 'Optimal Fast-Charge Milestone (90%)',
+              percentage: 90,
+              message: 'Battery has reached 90%! Fast charging is tapering down to protect battery cell chemistry.',
+            }
+          : undefined;
 
         set((state) => ({
           chargingSession: {
@@ -1271,6 +1337,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             energyDeliveredKwh: nextKwh,
             chargingPower: dynamicPower,
           },
+          ...(milestoneNotif ? { completionNotification: milestoneNotif } : {}),
         }));
       },
 

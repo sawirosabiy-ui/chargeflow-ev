@@ -42,6 +42,7 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
   // Drag state
   const isDragging = useRef(false);
   const lastClientX = useRef(0);
+  const lastClientY = useRef(0);
   const lastTimestamp = useRef(0);
   const activePointerId = useRef<number | null>(null);
 
@@ -62,8 +63,8 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
     const canvas = gl.domElement;
     if (!canvas) return;
 
-    // Guarantee browser touch actions like scrolling and pinch-zoom don't interfere
-    canvas.style.touchAction = 'none';
+    // Allow vertical scrolling while keeping horizontal rotation responsive
+    canvas.style.touchAction = 'pan-y';
     canvas.style.userSelect = 'none';
     (canvas.style as any).webkitUserSelect = 'none';
 
@@ -133,12 +134,13 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
       }
     };
 
-    // 4. Native Touch Event Fallbacks (Prevents mobile Safari/Chrome swipe gesture conflict)
+    // 4. Native Touch Event Fallbacks (Smoothly coordinates horizontal car rotation and vertical page scrolling)
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
         isDragging.current = true;
         const touch = e.touches[0];
         lastClientX.current = touch.clientX;
+        lastClientY.current = touch.clientY;
         lastTimestamp.current = performance.now();
         velocity.current = 0;
         targetRotY.current = currentRotY.current;
@@ -151,15 +153,25 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!isDragging.current || e.touches.length === 0) return;
-      if (e.cancelable) {
-        e.preventDefault(); // Crucial: stops mobile browser navigation gestures
-      }
 
       const touch = e.touches[0];
+      const deltaX = touch.clientX - lastClientX.current;
+      const deltaY = touch.clientY - lastClientY.current;
+
+      // Allow vertical page scroll if vertical motion dominates
+      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 5) {
+        isDragging.current = false;
+        return;
+      }
+
+      if (e.cancelable) {
+        e.preventDefault(); // Stop mobile browser back/forward navigation gestures on horizontal drag
+      }
+
       const now = performance.now();
       const dt = Math.max(1, now - lastTimestamp.current);
-      const deltaX = touch.clientX - lastClientX.current;
       lastClientX.current = touch.clientX;
+      lastClientY.current = touch.clientY;
       lastTimestamp.current = now;
 
       if (deltaX !== 0) {

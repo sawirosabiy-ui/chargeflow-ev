@@ -51,9 +51,10 @@ export const Cockpit3DStage: React.FC<Cockpit3DStageProps> = React.memo(({
   }, []);
 
   // Fixed eye-level automotive camera - responsive for mobile vs desktop
-  const cameraPosition: [number, number, number] = [0.0, isMobile ? 0.32 : 0.44, isMobile ? 5.8 : 4.45];
-  const cameraFov = isMobile ? 40 : 34;
-  const stageScale = isMobile ? 0.82 : 1.0;
+  // On mobile: elevate stage and position camera so the car sits directly in the middle/upper-middle of the screen
+  const cameraPosition: [number, number, number] = [0.0, isMobile ? 0.18 : 0.38, isMobile ? 4.7 : 4.45];
+  const cameraFov = isMobile ? 35 : 34;
+  const stageScale = isMobile ? 0.96 : 1.0;
 
   return (
     <div className={`relative ${className} select-none cursor-grab active:cursor-grabbing w-full h-full`}>
@@ -73,8 +74,8 @@ export const Cockpit3DStage: React.FC<Cockpit3DStageProps> = React.memo(({
       >
         <ResponsiveCamera position={cameraPosition} fov={cameraFov} />
 
-        {/* Stationary Stage / Ground Pad with Car-Only 360 Rotation */}
-        <group position={[0, isMobile ? -0.36 : -0.46, 0]} scale={stageScale}>
+        {/* Stationary Stage / Ground Pad with Car-Only 360 Rotation - centered on mobile */}
+        <group position={[0, isMobile ? 0.06 : -0.38, 0]} scale={stageScale}>
           <ChargingEnvironment
             isCharging={isCharging}
             batterySoc={vehicle.batterySoc || 66}

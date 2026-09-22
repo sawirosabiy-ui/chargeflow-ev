@@ -80,13 +80,16 @@ export interface DbReservation {
     | 'CHARGING'
     | 'PAYMENT_PENDING'
     | 'COMPLETED'
-    | 'CANCELLED';
+    | 'CANCELLED'
+    | 'EXPIRED';
   queuePosition?: number;
   arrivalDeadlineMin: number;
   pinConfirmed: boolean;
   createdAt: number;
   authCode?: string; // 4-digit unique dispenser unlock PIN
   authCodeExpiresAt?: number; // 1-hour expiration timestamp
+  reservationStart?: number;
+  reservationEnd?: number;
 }
 
 export interface OtpRecord {

@@ -1,9 +1,11 @@
 import React, { useMemo, useEffect, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { Check } from "lucide-react";
 import { VehicleStage } from "../../canvas/VehicleStage";
 import { ChargingEnvironment } from "../../canvas/charging-bay";
 import { useChargeFlowStore } from "../../../store/useChargeFlowStore";
+import { VEHICLE_COLORS } from "../../../data/cars";
 
 interface AheStation3DStageProps {
   isCharging: boolean;
@@ -39,7 +41,8 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
   batterySoc = 66,
   onUserInteraction,
 }) => {
-  const { vehicle, theme } = useChargeFlowStore();
+  const { vehicle, theme, setVehicleColor } = useChargeFlowStore();
+  const isCream = theme === 'cream';
   const isComplete = batterySoc >= 100;
   const isActivelyCharging = isCharging && !isComplete;
 
@@ -77,9 +80,9 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
     const targetFillRatio = isMobile ? 0.88 : 0.84;
     // Effective car width in world units ~3.45m with scale 1.95
     const targetVisibleWidth = 3.20 / targetFillRatio;
-    cameraZ = isMobile ? 4.9 : 4.6;
-    cameraY = isMobile ? 0.40 : 0.42;
-    stageY = isMobile ? -0.52 : -0.56;
+    cameraZ = isMobile ? 4.7 : 4.6;
+    cameraY = isMobile ? 0.20 : 0.32;
+    stageY = isMobile ? -0.10 : -0.32;
     centerX = 0.0;
     stageScale = isMobile ? 0.94 : 0.98;
 
@@ -170,6 +173,44 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
             </ChargingEnvironment>
           </group>
         </Canvas>
+      </div>
+
+      {/* 3. Floating Studio Swatch Bar (Option 1: 1-Tap Live Exterior Color Swatches in Cockpit) */}
+      <div className="absolute bottom-20 sm:bottom-24 xl:bottom-24 left-1/2 -translate-x-1/2 z-20 pointer-events-auto select-none">
+        <div className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-full border backdrop-blur-2xl transition-all shadow-xl ${
+          isCream
+            ? 'bg-[#FAF7F2]/90 border-amber-900/15 text-slate-800 shadow-[0_10px_30px_rgba(40,20,10,0.15)]'
+            : 'bg-[#08101E]/85 border-teal-500/30 text-white shadow-[0_10px_30px_rgba(0,0,0,0.7)]'
+        }`}>
+          {VEHICLE_COLORS.map((color) => {
+            const isSelected = (vehicle.paintColor || '#0284c7').toLowerCase() === color.hex.toLowerCase();
+            const isLight = color.id === 'white' || color.id === 'silver';
+            return (
+              <button
+                key={color.id}
+                type="button"
+                onClick={() => setVehicleColor(color.hex, color.name)}
+                title={`Vehicle Color: ${color.name}`}
+                className={`relative w-6 h-6 rounded-full transition-all duration-150 cursor-pointer flex items-center justify-center shrink-0 ${
+                  isSelected
+                    ? 'scale-110 ring-2 ring-teal-400 ring-offset-2 shadow-[0_0_12px_rgba(45,212,191,0.6)]'
+                    : 'hover:scale-105 opacity-80 hover:opacity-100'
+                } ${isCream ? 'ring-offset-[#FAF7F2]' : 'ring-offset-[#070D1A]'}`}
+                style={{
+                  backgroundColor: color.hex,
+                  border: `1px solid ${color.borderHex || 'rgba(255,255,255,0.2)'}`,
+                }}
+              >
+                {isSelected && (
+                  <Check
+                    className={`w-3 h-3 ${isLight ? 'text-slate-950' : 'text-white'}`}
+                    strokeWidth={3}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -88,35 +88,69 @@ export const VehicleGroundingSystem: React.FC<VehicleGroundingSystemProps> = ({
   onGrounded,
 }) => {
   const containerRef = useRef<THREE.Group>(null);
-  const [groundingApplied, setGroundingApplied] = useState(false);
+  const [, setGroundingApplied] = useState(false);
 
   useLayoutEffect(() => {
     if (!containerRef.current) return;
 
-    const metrics = calculateVehicleGrounding(containerRef.current);
-    
-    // Calculate delta needed so lowest point touches surfaceY exactly
-    const currentLowest = metrics.lowestPoint;
-    const deltaY = surfaceY - currentLowest + groundingOffset;
+    const applyGrounding = () => {
+      const container = containerRef.current;
+      if (!container) return false;
 
-    if (!isNaN(deltaY) && isFinite(deltaY)) {
-      containerRef.current.position.y += deltaY;
-      containerRef.current.position.x += (targetX - metrics.center.x);
-      containerRef.current.position.z += (targetZ - metrics.center.z);
-      containerRef.current.updateMatrixWorld(true);
-      setGroundingApplied(true);
-    }
+      // Temporarily reset position to measure baseline dimensions accurately
+      container.position.set(targetX, 0, targetZ);
+      container.updateMatrixWorld(true);
 
-    if (onGrounded) {
-      onGrounded({
-        lowestPoint: metrics.lowestPoint,
-        height: metrics.size.y,
-        width: metrics.size.x,
-        length: metrics.size.z,
-        isTireDetected: metrics.isTireDetected,
-      });
-    }
-  }, [surfaceY, groundingOffset, targetX, targetZ, onGrounded]);
+      const metrics = calculateVehicleGrounding(container);
+
+      // If scene is not yet loaded / empty, return false to retry
+      if (metrics.size.lengthSq() < 0.01) {
+        return false;
+      }
+
+      const deltaY = surfaceY - metrics.lowestPoint + groundingOffset;
+      const deltaX = !isNaN(metrics.center.x) && isFinite(metrics.center.x)
+        ? targetX - (metrics.center.x - targetX)
+        : targetX;
+      const deltaZ = !isNaN(metrics.center.z) && isFinite(metrics.center.z)
+        ? targetZ - (metrics.center.z - targetZ)
+        : targetZ;
+
+      if (!isNaN(deltaY) && isFinite(deltaY)) {
+        container.position.y = deltaY;
+        container.position.x = deltaX;
+        container.position.z = deltaZ;
+        container.updateMatrixWorld(true);
+        setGroundingApplied(true);
+      }
+
+      if (onGrounded) {
+        onGrounded({
+          lowestPoint: metrics.lowestPoint,
+          height: metrics.size.y,
+          width: metrics.size.x,
+          length: metrics.size.z,
+          isTireDetected: metrics.isTireDetected,
+        });
+      }
+
+      return true;
+    };
+
+    // Immediate attempt
+    const success = applyGrounding();
+
+    // If GLB model is streaming asynchronously, poll briefly until meshes are loaded
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (applyGrounding() || attempts > 30) {
+        clearInterval(interval);
+      }
+    }, 60);
+
+    return () => clearInterval(interval);
+  }, [children, surfaceY, groundingOffset, targetX, targetZ, onGrounded]);
 
   return (
     <group ref={containerRef} name="VehicleGroundingContainer">

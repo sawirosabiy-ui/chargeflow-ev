@@ -80,29 +80,33 @@ const DynamicCarModel: React.FC<DynamicCarModelProps> = ({
     const clone = scene.clone(true);
     clone.updateMatrixWorld(true);
 
-    // Calculate Bounding Box & Center
-    const rawBox = new THREE.Box3().setFromObject(clone);
+    // Helper: compute bounding box strictly from visible meshes to ignore helper empties/lights
+    const computeMeshBox = (obj: THREE.Object3D) => {
+      const b = new THREE.Box3();
+      obj.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh && child.visible) {
+          b.expandByObject(child);
+        }
+      });
+      return b.isEmpty() ? new THREE.Box3().setFromObject(obj) : b;
+    };
+
+    // 1. Initial orientation alignment if car length is along X axis
+    const rawBox = computeMeshBox(clone);
     const rawSize = new THREE.Vector3();
-    const rawCenter = new THREE.Vector3();
     rawBox.getSize(rawSize);
-    rawBox.getCenter(rawCenter);
 
-    // Center the model locally
-    clone.position.sub(rawCenter);
-    clone.updateMatrixWorld(true);
-
-    // Auto-align orientation if car length is along X axis
     if (rawSize.x > rawSize.z * 1.25) {
       clone.rotation.y = Math.PI / 2;
       clone.updateMatrixWorld(true);
     }
 
-    // Dynamic auto-scaling to standard vehicle length
-    const alignedBox = new THREE.Box3().setFromObject(clone);
-    const alignedSize = new THREE.Vector3();
-    alignedBox.getSize(alignedSize);
+    // 2. Dynamic auto-scaling to standard vehicle length
+    const orientedBox = computeMeshBox(clone);
+    const orientedSize = new THREE.Vector3();
+    orientedBox.getSize(orientedSize);
 
-    const maxDimension = Math.max(alignedSize.x, alignedSize.z);
+    const maxDimension = Math.max(orientedSize.x, orientedSize.z);
     const targetLength = scale || vehicleConfig.defaultScale || 4.2;
     const scaleFactor =
       maxDimension > 0.001 && !isNaN(maxDimension) && isFinite(maxDimension)
@@ -112,8 +116,21 @@ const DynamicCarModel: React.FC<DynamicCarModelProps> = ({
     clone.scale.setScalar(scaleFactor);
     clone.updateMatrixWorld(true);
 
-    // Ground vehicle bottom precisely at Y = 0 using wheel/tire contact points
-    const finalBox = new THREE.Box3().setFromObject(clone);
+    // 3. Mathematical Centering along X and Z axes
+    const scaledBox = computeMeshBox(clone);
+    const scaledCenter = new THREE.Vector3();
+    scaledBox.getCenter(scaledCenter);
+
+    if (!isNaN(scaledCenter.x) && isFinite(scaledCenter.x)) {
+      clone.position.x -= scaledCenter.x;
+    }
+    if (!isNaN(scaledCenter.z) && isFinite(scaledCenter.z)) {
+      clone.position.z -= scaledCenter.z;
+    }
+    clone.updateMatrixWorld(true);
+
+    // 4. Ground vehicle bottom precisely at Y = 0 using wheel/tire contact points
+    const finalBox = computeMeshBox(clone);
     let lowestTireY = Infinity;
     let tireFound = false;
 

@@ -118,6 +118,30 @@ export interface TranslationStrings {
   signInSubtitle: string;
   createAccountSubtitle: string;
   getStartedBtn: string;
+  networkBanner: string;
+  heroHeading1: string;
+  heroHeading2: string;
+  openCockpit: string;
+  exploreStations: string;
+  stepReserve: string;
+  stepCharge: string;
+  stepGo: string;
+  view360: string;
+  exteriorPaint: string;
+  powertrainLabel: string;
+  step1Title: string;
+  step1Desc: string;
+  step2Title: string;
+  step2Desc: string;
+  step3Title: string;
+  step3Desc: string;
+  copilotBadge: string;
+  copilotTitle: string;
+  copilotDesc: string;
+  copilotBtn: string;
+  footerRights: string;
+  autoSpin: string;
+  pauseSpin: string;
 
   // Payments & Currency
   telebirr: string;
@@ -371,6 +395,30 @@ export const translations: Record<Language, TranslationStrings> = {
     signInSubtitle: "Sign in to access your cockpit and charging bays.",
     createAccountSubtitle: "Join Ethiopia's premier green EV network.",
     getStartedBtn: "Get Started",
+    networkBanner: "ETHIOPIA'S PREMIER EV NETWORK",
+    heroHeading1: "YOUR EV.",
+    heroHeading2: "READY WHEN YOU ARE.",
+    openCockpit: "Open Vehicle Cockpit",
+    exploreStations: "Explore Stations",
+    stepReserve: "RESERVE",
+    stepCharge: "CHARGE",
+    stepGo: "GO",
+    view360: "360° VIEW",
+    exteriorPaint: "Exterior Paint",
+    powertrainLabel: "Powertrain",
+    step1Title: "Find a Station",
+    step1Desc: "Explore 120kW DC fast charging stations across Addis Ababa with real-time bay availability.",
+    step2Title: "Reserve Your Slot",
+    step2Desc: "Guarantee your bay in advance with a 30 ETB deposit directly from your ChargeFlow wallet or Telebirr.",
+    step3Title: "Charge Seamlessly",
+    step3Desc: "Pull onto the charging pad. Monitor real-time energy flow and completed session records.",
+    copilotBadge: "AI EV Assistant",
+    copilotTitle: "ChargeFlow AI Copilot",
+    copilotDesc: "Context-aware guidance for charging speeds, battery preconditioning, and route planning.",
+    copilotBtn: "Ask AI Copilot",
+    footerRights: "ChargeFlow Ethiopia © 2026 • Real-world EV Intelligence & Clean Energy",
+    autoSpin: "Auto Spin",
+    pauseSpin: "Pause Spin",
 
     telebirr: "Telebirr",
     cbeBirr: "CBE Birr",
@@ -620,6 +668,30 @@ export const translations: Record<Language, TranslationStrings> = {
     signInSubtitle: "ወደ ኮክፒትዎ እና ቻርጀሮች ለመግባት ይግቡ።",
     createAccountSubtitle: "የኢትዮጵያ ቀዳሚ የኢቪ ኔትወርክን ይቀላቀሉ።",
     getStartedBtn: "ይጀምሩ",
+    networkBanner: "የኢትዮጵያ ቀዳሚ የኢቪ ኔትወርክ",
+    heroHeading1: "የእርስዎ ኢቪ።",
+    heroHeading2: "እርስዎ ሲዘጋጁ ዝግጁ ነው።",
+    openCockpit: "የተሽከርካሪ ኮክፒት ክፈት",
+    exploreStations: "ጣቢያዎችን ያስሱ",
+    stepReserve: "ቦታ ያስይዙ",
+    stepCharge: "ቻርጅ ያድርጉ",
+    stepGo: "ይጓዙ",
+    view360: "360° እይታ",
+    exteriorPaint: "የውጭ ቀለም",
+    powertrainLabel: "የሞተር ኃይል",
+    step1Title: "ጣቢያ ያግኙ",
+    step1Desc: "በአዲስ አበባ ውስጥ ያሉ 120kW የዲሲ ፈጣን ቻርጅ ማድረጊያ ጣቢያዎችን በቅጽበት ይፈልጉ።",
+    step2Title: "ቦታዎን ያስይዙ",
+    step2Desc: "ከቻርጅፍሎው ቦርሳዎ ወይም በቴሌብር በ30 ብር ቅድመ ክፍያ የቻርጅ ማድረጊያ ቦታዎን ያረጋግጡ።",
+    step3Title: "በቀላሉ ቻርጅ ያድርጉ",
+    step3Desc: "ወደ ቻርጅ ማድረጊያው ፓድ ይግቡ። የኃይል ፍሰቱን እና የተጠናቀቁ ክፍለ-ጊዜዎችን ይከታተሉ።",
+    copilotBadge: "AI የኢቪ ረዳት",
+    copilotTitle: "ቻርጅፍሎው AI ኮፓይለት",
+    copilotDesc: "የኃይል መሙላት ፍጥነትን፣ የባትሪ ቅድመ-ዝግጅትን እና የመንገድ እቅድን የሚያግዝ ዘመናዊ ረዳት።",
+    copilotBtn: "AI ኮፓይለትን ይጠይቁ",
+    footerRights: "ቻርጅፍሎው ኢትዮጵያ © 2026 • የኢቪ ብልህ ቴክኖሎጂ እና ንጹሕ ኃይል",
+    autoSpin: "ራስ-አዙር",
+    pauseSpin: "አፍታ አቁም",
 
     telebirr: "ቴሌብር",
     cbeBirr: "ሲቢኢ ብር",
@@ -869,6 +941,30 @@ export const translations: Record<Language, TranslationStrings> = {
     signInSubtitle: "Kokpiitii fi bakka chaarjii argachuuf seeni.",
     createAccountSubtitle: "Neetwoorkii EV magariisa duraa Itoophiyaatti makamaa.",
     getStartedBtn: "Jalqabi",
+    networkBanner: "NEETWOORKII EV MAGARIISA DURAA ITOOPHIYAA",
+    heroHeading1: "KONKOLAATAA KEESSAN.",
+    heroHeading2: "YEROO BARBAADDANITTI QOPHAA'AA DHA.",
+    openCockpit: "Kokpiitii Konkolaataa Bani",
+    exploreStations: "Buufataalee Sakatta'aa",
+    stepReserve: "QABACHUU",
+    stepCharge: "CHAARJII",
+    stepGo: "DEEMI",
+    view360: "ILAALCHA 360°",
+    exteriorPaint: "Halluu Alaa",
+    powertrainLabel: "Humna Motoraa",
+    step1Title: "Buufata Barbaadaa",
+    step1Desc: "Buufataalee chaarjii saffisaa 120kW Finfinnee keessa jiran bakka banaa wajjin sakatta'aa.",
+    step2Title: "Bakka Keessan Qabadhaa",
+    step2Desc: "Waliigaltee Birrii 30 boorsaa ChargeFlow ykn Telebirr irraa kafaluun bakka keessan mirkaneeffadhaa.",
+    step3Title: "Salphaatti Chaarjii Godhaa",
+    step3Desc: "Bakka chaarjiitti seenaa. Yaatuu anniisaa fi galmee tajaajila xumuramee hordofaa.",
+    copilotBadge: "Gargaaraa EV AI",
+    copilotTitle: "ChargeFlow AI Copilot",
+    copilotDesc: "Saffisa chaarjii, qophii baatrii fi karoora deemsaa ilaalchisee gorsa qabatamaa argadhaa.",
+    copilotBtn: "AI Copilot Gaafadhaa",
+    footerRights: "ChargeFlow Itoophiyaa © 2026 • Beekumsa EV fi Anniisaa Qulqulluu",
+    autoSpin: "Ofiin Naannessi",
+    pauseSpin: "Dhaabi",
 
     telebirr: "Telebirr",
     cbeBirr: "CBE Birr",
@@ -1119,6 +1215,30 @@ export const translations: Record<Language, TranslationStrings> = {
     signInSubtitle: "ናብ ኮክፒትኩምን ቻርጀራትኩምን ንምእታው እተዉ።",
     createAccountSubtitle: "ናይ ኢትዮጵያ ቀዳማይ ናይ ኢቪ መርበብ ተጸንበሩ።",
     getStartedBtn: "ጀምሩ",
+    networkBanner: "ናይ ኢትዮጵያ ቀዳማይ ናይ ኢቪ መርበብ",
+    heroHeading1: "ናትኩም ኢቪ።",
+    heroHeading2: "ድሉዋት ኣብ ዝኾንኩምሉ ድሉው እዩ።",
+    openCockpit: "ናይ መኪና ኮክፒት ክፈት",
+    exploreStations: "ጣብያታት ዞሩ",
+    stepReserve: "ቦታ ሓዝ",
+    stepCharge: "ቻርጅ ግበር",
+    stepGo: "ኺድ",
+    view360: "360° ርእየት",
+    exteriorPaint: "ናይ ደገ ሕብሪ",
+    powertrainLabel: "ናይ ሞተር ሓይሊ",
+    step1Title: "ጣብያ ርከቡ",
+    step1Desc: "ኣብ ኣዲስ ኣበባ ዝርከቡ 120kW ናይ ዲሲ ቅልጡፍ ቻርጅ መውሃቢ ጣብያታት ብቐጥታ ድለዩ።" ,
+    step2Title: "ቦታኹም ሕዙ",
+    step2Desc: "ካብ ቻርጅፍሎው ቦርሳኹም ወይ ብቴሌብር ብ30 ቅርሺ ቅድመ ክፍሊት ብምግባር ቦታኹም ኣረጋግጹ።",
+    step3Title: "ብቐሊሉ ቻርጅ ግበሩ",
+    step3Desc: "ናብቲ ቻርጅ መውሃቢ ቦታ እተዉ። ዋሕዚ ኃይልን ዝተዛዘመ ክፍለ ግዜን ብቐጥታ ተኸታተሉ።",
+    copilotBadge: "AI ናይ ኢቪ ሓጋዚ",
+    copilotTitle: "ቻርጅፍሎው AI ኮፓይለት",
+    copilotDesc: "ናይ ቻርጅ ፍጥነት፣ ናይ ባትሪ ቅድመ-ድልውነትን ናይ ጉዕዞ ውጥንን ዝሕግዝ ዘመናዊ ሓጋዚ።",
+    copilotBtn: "AI ኮፓይለት ሕተቱ",
+    footerRights: "ቻርጅፍሎው ኢትዮጵያ © 2026 • ብልሒ ኢቪን ንጹህ ኃይልን",
+    autoSpin: "ብባዕሉ ዘውር",
+    pauseSpin: "ኣዕርፍ",
 
     telebirr: "ቴሌብር",
     cbeBirr: "ሲቢኢ ብር",
