@@ -869,7 +869,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
             transactions: freshWallet.transactions,
           },
           reservation: newReservation,
-          receiptModal: generatedReceipt,
+          receiptModal: null,
         });
 
         return {

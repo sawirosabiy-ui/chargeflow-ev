@@ -27,6 +27,7 @@ import {
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 import { useTranslation } from '../../localization/useTranslation';
 import { VehicleCutout } from '../vehicle/VehicleCutout';
+import { prewarmAudioContext } from '../../utils/audio';
 
 interface BayDispenserVisualProps {
   status: 'available' | 'charging' | 'reserved' | 'offline';
@@ -150,6 +151,7 @@ export const ReservationView: React.FC = () => {
   };
 
   const handlePinInput = (digit: string) => {
+    prewarmAudioContext();
     if (isProcessingPayment) return;
     if (pin.length < 4) {
       const nextPin = pin + digit;
@@ -182,6 +184,7 @@ export const ReservationView: React.FC = () => {
   };
 
   const handleConfirmReservationClick = () => {
+    prewarmAudioContext();
     if (isProcessingPayment) return;
     if (!user.isAuthenticated) {
       openAuthModal('signup');
