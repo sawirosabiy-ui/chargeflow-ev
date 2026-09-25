@@ -212,6 +212,9 @@ export const ReservationReceiptModal: React.FC = () => {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
       
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
