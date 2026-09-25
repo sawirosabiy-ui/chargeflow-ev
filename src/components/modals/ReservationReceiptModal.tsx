@@ -402,9 +402,9 @@ export const ReservationReceiptModal: React.FC = () => {
   const isComplete = animationPhase === 'confirmed';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in select-none overflow-y-auto scroll-smooth">
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-start sm:items-center justify-center p-2.5 sm:p-4 animate-in fade-in select-none overflow-y-auto overscroll-contain py-4 sm:py-8">
       <div 
-        className={`relative w-full max-w-md my-auto rounded-3xl border shadow-2xl transition-all duration-300 overflow-hidden flex flex-col ${
+        className={`relative w-full max-w-md mx-auto my-auto rounded-3xl border shadow-2xl transition-all duration-300 flex flex-col ${
           isCream
             ? 'bg-[#FAF7F2] border-amber-900/20 text-slate-900 shadow-[0_25px_60px_rgba(40,20,10,0.25)]'
             : 'bg-[#070B14]/95 border-teal-500/30 text-white shadow-[0_25px_70px_rgba(0,0,0,0.95)]'
@@ -415,7 +415,7 @@ export const ReservationReceiptModal: React.FC = () => {
         <div className="absolute -bottom-24 -left-24 w-60 h-60 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
         {/* Modal Header Bar */}
-        <div className="relative px-5 pt-4 pb-2 flex items-center justify-between border-b border-white/5 shrink-0 z-20">
+        <div className="relative px-4 sm:px-5 pt-3.5 pb-2 flex items-center justify-between border-b border-white/5 shrink-0 z-20">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400">
               <Sparkles className="w-3.5 h-3.5" />
@@ -483,7 +483,7 @@ export const ReservationReceiptModal: React.FC = () => {
         {/* ========================================================================= */}
         {/* THE DIGITAL TICKET DISPENSER & UPWARD "FEED/PRINT" MOTION CONTAINER       */}
         {/* ========================================================================= */}
-        <div className="relative px-3 sm:px-5 py-2 overflow-hidden flex-1 min-h-[460px]">
+        <div className="relative px-2.5 sm:px-5 py-2 overflow-hidden flex-1">
           {/* Subtle Top Digital Emitter Slit */}
           <div className="relative z-10 w-full mb-1">
             <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-teal-400 to-transparent laser-aperture" />

@@ -110,27 +110,27 @@
 /* Digital Charging Reservation Ticket Feed & Emitter Animations */
 @keyframes ticketFeedUp {
   0% {
-    transform: translateY(14%) scale(0.985);
-    opacity: 1;
+    transform: translateY(28px) scale(0.985);
+    opacity: 0.92;
   }
   15% {
-    transform: translateY(11%) scale(0.99);
+    transform: translateY(22px) scale(0.99);
     opacity: 1;
   }
   30% {
-    transform: translateY(8%) scale(0.992);
+    transform: translateY(15px) scale(0.993);
   }
   50% {
-    transform: translateY(4.5%) scale(0.996);
+    transform: translateY(8px) scale(0.996);
   }
   70% {
-    transform: translateY(1.5%) scale(1);
+    transform: translateY(3px) scale(0.998);
   }
   88% {
-    transform: translateY(-0.8%) scale(1);
+    transform: translateY(-2px) scale(1);
   }
   100% {
-    transform: translateY(0%) scale(1);
+    transform: translateY(0px) scale(1);
     opacity: 1;
   }
 }
