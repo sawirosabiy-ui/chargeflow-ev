@@ -24,31 +24,52 @@ export const QueueView: React.FC = () => {
   const { t } = useTranslation();
   const isCream = theme === 'cream';
 
-  // Live countdown timer (simulating ~12 min wait)
-  const [secondsRemaining, setSecondsRemaining] = useState(12 * 60);
+  // Live dynamic queue state & countdown simulation
+  const [car1Soc, setCar1Soc] = useState(94);
+  const [car1Departed, setCar1Departed] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(120);
 
-  const isReady = reservation?.status === 'READY_TO_CHARGE';
+  const isReady = reservation?.status === 'READY_TO_CHARGE' || car1Departed;
 
   useEffect(() => {
     const timer = setInterval(() => {
+      setCar1Soc((prev) => {
+        if (prev >= 100) {
+          if (!car1Departed) {
+            setCar1Departed(true);
+            setReadyToCharge();
+          }
+          return 100;
+        }
+        return prev + 1;
+      });
+
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
+          setCar1Departed(true);
           setReadyToCharge();
           return 0;
         }
         return prev - 1;
       });
-    }, 1000);
+    }, 1500);
+
     return () => clearInterval(timer);
-  }, [setReadyToCharge]);
+  }, [car1Departed, setReadyToCharge]);
 
   const minutes = Math.floor(secondsRemaining / 60);
   const seconds = secondsRemaining % 60;
-  const formattedTime = `~${minutes} min remaining`;
+  const formattedTime = car1Departed ? 'Bay released' : `~${minutes}m ${seconds}s remaining`;
 
   const handleStartCharging = () => {
     startChargingSession();
     setView('charging');
+  };
+
+  const handleSimulateDeparture = () => {
+    setCar1Soc(100);
+    setCar1Departed(true);
+    setReadyToCharge();
   };
 
   return (
@@ -67,11 +88,11 @@ export const QueueView: React.FC = () => {
                   ✓ YOUR TURN
                 </span>
                 <span className="text-xs sm:text-sm font-mono font-bold text-emerald-400">
-                  {reservation?.bayNumber || 'Bay 02'} is ready for your vehicle
+                  {reservation?.bayNumber || 'Bay 02'} is released and ready for your vehicle
                 </span>
               </div>
               <p className={`text-xs ${isCream ? 'text-stone-700' : 'text-slate-300'}`}>
-                Please connect your vehicle within 5 minutes.
+                Previous car filled to 100% and departed. Please connect your vehicle within 5 minutes.
               </p>
             </div>
           </div>
@@ -100,7 +121,7 @@ export const QueueView: React.FC = () => {
 
             <button
               onClick={handleStartCharging}
-              className="flex-1 md:flex-initial py-3 px-5 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.5)] transition-all cursor-pointer"
+              className="flex-1 md:flex-initial py-3 px-5 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.5)] transition-all cursor-pointer animate-pulse"
             >
               <Zap className="w-4 h-4 fill-slate-950" />
               <span>START CHARGING</span>
@@ -126,7 +147,7 @@ export const QueueView: React.FC = () => {
             </span>
           </div>
           <p className={`text-xs sm:text-sm mt-1 ${isCream ? "text-stone-500" : "text-slate-400"}`}>
-            {t.queueSubtitle}
+            {car1Departed ? "Bay released — You are now active in the charging bay" : t.queueSubtitle}
           </p>
         </div>
 
@@ -152,32 +173,63 @@ export const QueueView: React.FC = () => {
         <div className="lg:col-span-8 space-y-6">
           {/* Queue 3-Car Progression Cards */}
           <div className="space-y-3">
-            <div className={`text-[11px] font-mono font-bold tracking-widest uppercase ${isCream ? "text-stone-500" : "text-slate-400"}`}>
-              {t.queueOverview}
+            <div className="flex items-center justify-between">
+              <div className={`text-[11px] font-mono font-bold tracking-widest uppercase ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                {t.queueOverview}
+              </div>
+              {!car1Departed && (
+                <button
+                  type="button"
+                  onClick={handleSimulateDeparture}
+                  className="text-[10px] font-mono text-teal-400 hover:text-teal-300 font-bold px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 transition-colors"
+                >
+                  ⚡ Fast-Forward Car #01 Departure
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              {/* Car #01 Currently Charging */}
-              <div className={`p-4 rounded-3xl border space-y-3 ${isCream ? "bg-white border-stone-200 shadow-sm" : "bg-[#0E131F] border-white/5"}`}>
+              {/* Car #01 Currently Charging / Departed */}
+              <div className={`p-4 rounded-3xl border space-y-3 transition-all ${
+                car1Departed 
+                  ? "opacity-60 border-slate-700/50 bg-[#0E131F]/50" 
+                  : isCream 
+                  ? "bg-white border-stone-200 shadow-sm" 
+                  : "bg-[#0E131F] border-white/5"
+              }`}>
                 <div className="flex items-center justify-between">
                   <span className={`text-xs font-mono font-bold ${isCream ? "text-stone-500" : "text-slate-400"}`}>#01</span>
-                  <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-wide">{t.currentlyCharging}</span>
+                  <span className={`text-[9px] font-bold uppercase tracking-wide ${car1Departed ? "text-slate-400" : "text-cyan-400"}`}>
+                    {car1Departed ? "DEPARTED ✓" : t.currentlyCharging}
+                  </span>
                 </div>
                 {/* Vehicle Thumbnail */}
                 <div className="h-16 flex items-center justify-center">
                   <VehicleCutout modelId="tesla-model-y" modelName="Tesla Model Y" paintColor="#64748B" className="w-28 h-16 shrink-0 opacity-80" />
                 </div>
                 <div className="text-center font-mono">
-                  <div className={`text-xs font-bold ${isCream ? "text-stone-900" : "text-white"}`}>91% • 86 kW</div>
-                  <div className={`text-[10px] mt-0.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>~8 min remaining</div>
+                  <div className={`text-xs font-bold ${isCream ? "text-stone-900" : "text-white"}`}>
+                    {car1Soc}% • {car1Departed ? "Bay Released" : "86 kW"}
+                  </div>
+                  <div className={`text-[10px] mt-0.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                    {car1Departed ? "Vacated bay" : `${Math.max(1, 100 - car1Soc)} min left`}
+                  </div>
                 </div>
               </div>
 
               {/* Car #02 YOU (Active Highlighted Border - Exact Selected Vehicle Cutout) */}
-              <div className={`p-4 rounded-3xl border border-[#2DD4BF] space-y-3 shadow-[0_0_20px_rgba(45,212,191,0.15)] ring-1 ring-[#2DD4BF]/40 ${isCream ? "bg-white" : "bg-[#0E131F]"}`}>
+              <div className={`p-4 rounded-3xl border space-y-3 shadow-[0_0_20px_rgba(45,212,191,0.15)] ring-1 ${
+                isReady
+                  ? "border-emerald-400 ring-emerald-400/60 bg-emerald-500/10"
+                  : "border-[#2DD4BF] ring-[#2DD4BF]/40 " + (isCream ? "bg-white" : "bg-[#0E131F]")
+              }`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-[#2DD4BF]">#02 {user.name.split(" ")[0]}</span>
-                  <span className="text-[9px] font-bold text-[#2DD4BF] uppercase tracking-wide">{t.yourVehicleBadge}</span>
+                  <span className={`text-xs font-mono font-bold ${isReady ? "text-emerald-400" : "text-[#2DD4BF]"}`}>
+                    {isReady ? "#01 (YOUR TURN)" : `#02 ${user.name.split(" ")[0]}`}
+                  </span>
+                  <span className={`text-[9px] font-bold uppercase tracking-wide ${isReady ? "text-emerald-400" : "text-[#2DD4BF]"}`}>
+                    {isReady ? "BAY ASSIGNED" : t.yourVehicleBadge}
+                  </span>
                 </div>
                 {/* Vehicle Thumbnail */}
                 <div className="h-16 flex items-center justify-center">
@@ -189,16 +241,22 @@ export const QueueView: React.FC = () => {
                   />
                 </div>
                 <div className="text-center font-mono">
-                  <div className="text-xs font-bold text-emerald-500">{vehicle.batterySoc}% • {t.reserved}</div>
-                  <div className="text-[10px] text-[#2DD4BF] font-semibold mt-0.5">Est. start 14:42</div>
+                  <div className="text-xs font-bold text-emerald-400">{vehicle.batterySoc}% • {isReady ? "Ready to Plug" : t.reserved}</div>
+                  <div className="text-[10px] text-[#2DD4BF] font-semibold mt-0.5">
+                    {isReady ? "Connect charger now" : "Est. start: ~2 min"}
+                  </div>
                 </div>
               </div>
 
               {/* Car #03 Next in Queue */}
               <div className={`p-4 rounded-3xl border space-y-3 ${isCream ? "bg-white border-stone-200 shadow-sm" : "bg-[#0E131F] border-white/5"}`}>
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-mono font-bold ${isCream ? "text-stone-500" : "text-slate-400"}`}>#03</span>
-                  <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wide">{t.nextInQueue}</span>
+                  <span className={`text-xs font-mono font-bold ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                    {car1Departed ? "#02" : "#03"}
+                  </span>
+                  <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wide">
+                    {car1Departed ? "Next In Line" : t.nextInQueue}
+                  </span>
                 </div>
                 {/* Vehicle Thumbnail */}
                 <div className="h-16 flex items-center justify-center">
@@ -206,7 +264,9 @@ export const QueueView: React.FC = () => {
                 </div>
                 <div className="text-center font-mono">
                   <div className={`text-xs font-bold ${isCream ? "text-stone-900" : "text-white"}`}>54% • Waiting</div>
-                  <div className={`text-[10px] mt-0.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>Waiting for your turn</div>
+                  <div className={`text-[10px] mt-0.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>
+                    {car1Departed ? "Next after you finish" : "Waiting for your turn"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -220,9 +280,11 @@ export const QueueView: React.FC = () => {
 
             {/* Mobile View: Stacked Queue Cards (< md) */}
             <div className="md:hidden space-y-3">
-              {/* Item #1 */}
+              {/* Item #1: Car 01 or User if Car 01 departed */}
               <div className={`p-3.5 rounded-2xl border space-y-2.5 ${
-                isCream ? 'bg-stone-50/80 border-stone-200' : 'bg-white/[0.02] border-white/5'
+                car1Departed
+                  ? "bg-slate-900/50 border-white/5 opacity-60"
+                  : isCream ? 'bg-stone-50/80 border-stone-200' : 'bg-white/[0.02] border-white/5'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -231,62 +293,74 @@ export const QueueView: React.FC = () => {
                     </span>
                     <div>
                       <div className={`text-xs font-bold font-sans ${isCream ? 'text-stone-900' : 'text-white'}`}>
-                        Vehicle #01
+                        Tesla Model Y
                       </div>
-                      <div className="text-[10px] font-mono opacity-50">(Anonymous)</div>
+                      <div className="text-[10px] font-mono opacity-50">
+                        {car1Departed ? "Completed & Departed" : "(Anonymous)"}
+                      </div>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 text-[10px] font-bold">
-                    {t.chargingTitle}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    car1Departed ? "bg-slate-700/50 text-slate-300" : "bg-cyan-500/15 text-cyan-400"
+                  }`}>
+                    {car1Departed ? "DEPARTED ✓" : t.chargingTitle}
                   </span>
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] font-mono">
                     <span className="opacity-60">{t.batteryLabel}</span>
-                    <span className="font-bold text-cyan-400">91%</span>
+                    <span className="font-bold text-cyan-400">{car1Soc}%</span>
                   </div>
                   <div className={`h-1.5 w-full rounded-full overflow-hidden ${isCream ? 'bg-stone-200' : 'bg-slate-800'}`}>
-                    <div className="bg-cyan-400 h-full rounded-full w-[91%]" />
+                    <div className="bg-cyan-400 h-full rounded-full" style={{ width: `${car1Soc}%` }} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[10px] font-mono">
                   <div>
                     <div className="opacity-50">{t.powerLabel}</div>
-                    <div className={`font-bold mt-0.5 ${isCream ? 'text-stone-800' : 'text-slate-200'}`}>86 kW</div>
+                    <div className={`font-bold mt-0.5 ${isCream ? 'text-stone-800' : 'text-slate-200'}`}>
+                      {car1Departed ? "0 kW" : "86 kW"}
+                    </div>
                   </div>
                   <div>
                     <div className="opacity-50">{t.estTimeLabel}</div>
-                    <div className={`font-bold mt-0.5 ${isCream ? 'text-stone-800' : 'text-slate-200'}`}>~8 min</div>
+                    <div className={`font-bold mt-0.5 ${isCream ? 'text-stone-800' : 'text-slate-200'}`}>
+                      {car1Departed ? "Done" : `~${Math.max(1, 100 - car1Soc)} min`}
+                    </div>
                   </div>
                   <div>
                     <div className="opacity-50">{t.estStartLabel}</div>
-                    <div className="opacity-50 mt-0.5">—</div>
+                    <div className="opacity-50 mt-0.5">{car1Departed ? "Vacated" : "Active"}</div>
                   </div>
                 </div>
               </div>
 
               {/* Item #2: YOU */}
-              <div className={`p-3.5 rounded-2xl border border-[#2DD4BF]/50 space-y-2.5 shadow-[0_0_15px_rgba(45,212,191,0.1)] ${
-                isCream ? 'bg-[#2DD4BF]/10' : 'bg-[#2DD4BF]/5'
+              <div className={`p-3.5 rounded-2xl border space-y-2.5 shadow-[0_0_15px_rgba(45,212,191,0.15)] ${
+                isReady
+                  ? "border-emerald-400 bg-emerald-500/15"
+                  : "border-[#2DD4BF]/50 " + (isCream ? 'bg-[#2DD4BF]/10' : 'bg-[#2DD4BF]/5')
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-[#2DD4BF]/20 text-[#2DD4BF] text-xs font-mono font-bold flex items-center justify-center">
-                      #2
+                    <span className={`w-6 h-6 rounded-lg text-xs font-mono font-bold flex items-center justify-center ${
+                      isReady ? "bg-emerald-500 text-slate-950" : "bg-[#2DD4BF]/20 text-[#2DD4BF]"
+                    }`}>
+                      {isReady ? "#1" : "#2"}
                     </span>
                     <div>
-                      <div className="text-xs font-black font-sans text-[#2DD4BF] uppercase">
+                      <div className="text-xs font-black font-sans text-emerald-400 uppercase">
                         {vehicle.model}
                       </div>
-                      <div className="text-[10px] font-mono text-emerald-500 font-semibold">
-                        {t.yourVehicleBadge}
+                      <div className="text-[10px] font-mono text-emerald-400 font-semibold">
+                        {isReady ? "YOUR TURN (BAY ASSIGNED)" : t.yourVehicleBadge}
                       </div>
                     </div>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
-                    {t.reserved}
+                    {isReady ? "READY TO CHARGE" : t.reserved}
                   </span>
                 </div>
 
@@ -303,15 +377,15 @@ export const QueueView: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#2DD4BF]/20 text-[10px] font-mono">
                   <div>
                     <div className="opacity-50">{t.powerLabel}</div>
-                    <div className="font-bold mt-0.5 opacity-50">—</div>
+                    <div className="font-bold mt-0.5 text-emerald-400">120 kW (Ready)</div>
                   </div>
                   <div>
                     <div className="opacity-50">{t.estTimeLabel}</div>
-                    <div className="font-bold mt-0.5 text-[#2DD4BF]">~12 min</div>
+                    <div className="font-bold mt-0.5 text-[#2DD4BF]">{isReady ? "Now" : "~2 min"}</div>
                   </div>
                   <div>
                     <div className="opacity-50">{t.estStartLabel}</div>
-                    <div className="font-bold mt-0.5 text-emerald-400">14:42</div>
+                    <div className="font-bold mt-0.5 text-emerald-400">{isReady ? "Plug In" : "14:42"}</div>
                   </div>
                 </div>
               </div>
@@ -323,11 +397,11 @@ export const QueueView: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-mono font-bold flex items-center justify-center">
-                      #3
+                      {car1Departed ? "#2" : "#3"}
                     </span>
                     <div>
                       <div className={`text-xs font-bold font-sans ${isCream ? 'text-stone-900' : 'text-white'}`}>
-                        Vehicle #03
+                        BYD Atto 3
                       </div>
                       <div className="text-[10px] font-mono opacity-50">(Anonymous)</div>
                     </div>
@@ -380,52 +454,64 @@ export const QueueView: React.FC = () => {
                 </thead>
                 <tbody className={`divide-y ${isCream ? "divide-stone-100" : "divide-white/5"}`}>
                   {/* Row 1 */}
-                  <tr className={isCream ? "text-stone-700" : "text-slate-300"}>
+                  <tr className={`${car1Departed ? "opacity-50 " : ""}${isCream ? "text-stone-700" : "text-slate-300"}`}>
                     <td className="py-3.5 font-bold">1</td>
                     <td className="py-3.5">
-                      <div className={`font-sans font-bold ${isCream ? "text-stone-900" : "text-white"}`}>Vehicle #01</div>
-                      <div className={`text-[10px] font-mono ${isCream ? "text-stone-400" : "text-slate-500"}`}>(Anonymous)</div>
-                    </td>
-                    <td className="py-3.5">
-                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-500 text-[10px] font-bold">{t.chargingTitle}</span>
-                    </td>
-                    <td className="py-3.5">
-                      <div className={`font-bold ${isCream ? "text-stone-900" : "text-white"}`}>91%</div>
-                      <div className={`w-16 h-1 rounded-full mt-1 ${isCream ? "bg-stone-200" : "bg-slate-800"}`}>
-                        <div className="bg-cyan-400 h-full rounded-full w-[91%]"></div>
+                      <div className={`font-sans font-bold ${isCream ? "text-stone-900" : "text-white"}`}>Tesla Model Y</div>
+                      <div className={`text-[10px] font-mono ${isCream ? "text-stone-400" : "text-slate-500"}`}>
+                        {car1Departed ? "Completed & Departed" : "(Anonymous)"}
                       </div>
                     </td>
-                    <td className={`py-3.5 ${isCream ? "text-stone-900" : "text-white"}`}>86 kW</td>
-                    <td className={`py-3.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>~8 min remaining</td>
-                    <td className={`py-3.5 ${isCream ? "text-stone-400" : "text-slate-500"}`}>—</td>
+                    <td className="py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        car1Departed ? "bg-slate-700/50 text-slate-300" : "bg-cyan-500/10 text-cyan-500"
+                      }`}>
+                        {car1Departed ? "DEPARTED ✓" : t.chargingTitle}
+                      </span>
+                    </td>
+                    <td className="py-3.5">
+                      <div className={`font-bold ${isCream ? "text-stone-900" : "text-white"}`}>{car1Soc}%</div>
+                      <div className={`w-16 h-1 rounded-full mt-1 ${isCream ? "bg-stone-200" : "bg-slate-800"}`}>
+                        <div className="bg-cyan-400 h-full rounded-full" style={{ width: `${car1Soc}%` }}></div>
+                      </div>
+                    </td>
+                    <td className={`py-3.5 ${isCream ? "text-stone-900" : "text-white"}`}>{car1Departed ? "0 kW" : "86 kW"}</td>
+                    <td className={`py-3.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>{car1Departed ? "Vacated" : `~${Math.max(1, 100 - car1Soc)} min left`}</td>
+                    <td className={`py-3.5 ${isCream ? "text-stone-400" : "text-slate-500"}`}>{car1Departed ? "Released" : "Active"}</td>
                   </tr>
 
                   {/* Row 2: YOU */}
-                  <tr className={`font-bold ${isCream ? "bg-[#2DD4BF]/10 text-stone-900" : "bg-[#2DD4BF]/5 text-white"}`}>
-                    <td className="py-3.5 font-black text-[#2DD4BF]">2</td>
+                  <tr className={`font-bold ${
+                    isReady
+                      ? "bg-emerald-500/15 text-white"
+                      : isCream ? "bg-[#2DD4BF]/10 text-stone-900" : "bg-[#2DD4BF]/5 text-white"
+                  }`}>
+                    <td className="py-3.5 font-black text-emerald-400">{isReady ? "1" : "2"}</td>
                     <td className="py-3.5">
-                      <div className="font-sans font-black text-[#2DD4BF] uppercase">{vehicle.model}</div>
-                      <div className="text-[10px] text-emerald-500 font-mono">{t.yourVehicleBadge}</div>
+                      <div className="font-sans font-black text-emerald-400 uppercase">{vehicle.model}</div>
+                      <div className="text-[10px] text-emerald-400 font-mono">{isReady ? "YOUR TURN (BAY READY)" : t.yourVehicleBadge}</div>
                     </td>
                     <td className="py-3.5">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 text-[10px] font-bold border border-emerald-500/30">{t.reserved}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                        {isReady ? "READY TO CHARGE" : t.reserved}
+                      </span>
                     </td>
                     <td className="py-3.5">
-                      <div className="font-bold text-emerald-500">{vehicle.batterySoc}%</div>
+                      <div className="font-bold text-emerald-400">{vehicle.batterySoc}%</div>
                       <div className={`w-16 h-1 rounded-full mt-1 ${isCream ? "bg-stone-200" : "bg-slate-800"}`}>
                         <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${vehicle.batterySoc}%` }}></div>
                       </div>
                     </td>
-                    <td className={`py-3.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>—</td>
-                    <td className="py-3.5 text-[#2DD4BF]">~12 min remaining</td>
-                    <td className="py-3.5 text-emerald-500 font-bold">14:42</td>
+                    <td className={`py-3.5 ${isCream ? "text-stone-500" : "text-slate-400"}`}>{isReady ? "120 kW" : "—"}</td>
+                    <td className="py-3.5 text-emerald-400">{isReady ? "Ready Now" : "~2 min remaining"}</td>
+                    <td className="py-3.5 text-emerald-400 font-bold">{isReady ? "Plug In" : "14:42"}</td>
                   </tr>
 
                   {/* Row 3 */}
                   <tr className={isCream ? "text-stone-700" : "text-slate-300"}>
-                    <td className="py-3.5 font-bold">3</td>
+                    <td className="py-3.5 font-bold">{car1Departed ? "2" : "3"}</td>
                     <td className="py-3.5">
-                      <div className={`font-sans font-bold ${isCream ? "text-stone-900" : "text-white"}`}>Vehicle #03</div>
+                      <div className={`font-sans font-bold ${isCream ? "text-stone-900" : "text-white"}`}>BYD Atto 3</div>
                       <div className={`text-[10px] font-mono ${isCream ? "text-stone-400" : "text-slate-500"}`}>(Anonymous)</div>
                     </td>
                     <td className="py-3.5">

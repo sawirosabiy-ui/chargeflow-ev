@@ -979,14 +979,15 @@ export const ReservationView: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">Select Amount</span>
+              <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400">Select Amount (Min. 50 ETB Required)</span>
               <div className="grid grid-cols-3 gap-2">
-                {[200, 500, 1000].map((amt) => (
+                {[100, 200, 500].map((amt) => (
                   <button
                     key={amt}
                     onClick={() => {
                       topupWalletBalance(amt, 'Telebirr');
                       setShowTopupModal(false);
+                      setShowPinModal(true);
                     }}
                     className="py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-mono font-bold text-xs transition-all active:scale-95 cursor-pointer"
                   >

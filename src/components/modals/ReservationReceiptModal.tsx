@@ -18,7 +18,8 @@ import {
   KeyRound,
   Timer,
   Copy,
-  Check
+  Check,
+  Users
 } from 'lucide-react';
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 import { generateQRCodeSVG } from '../../utils/qrCode';
@@ -348,17 +349,17 @@ export const ReservationReceiptModal: React.FC = () => {
   };
 
   const qrCodeUrl = useMemo(() => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chargeflow-ev.com';
-    return `${origin}/?res=${encodeURIComponent(activeResId)}&station=${encodeURIComponent(stationName)}&bay=${encodeURIComponent(bayNumber)}&amount=${amountEtb}&pin=${encodeURIComponent(activePin)}`;
-  }, [activeResId, stationName, bayNumber, amountEtb, activePin]);
+    // Compact canonical URI for instant camera barcode scanning across iOS & Android Lens
+    return `https://chargeflow-ev.com/v?r=${encodeURIComponent(activeResId)}&p=${encodeURIComponent(activePin)}`;
+  }, [activeResId, activePin]);
 
   const qrSvgString = useMemo(() => {
     try {
       return generateQRCodeSVG(qrCodeUrl, {
-        padding: 2,
+        padding: 4,
         fgColor: '#070C18',
         bgColor: '#FFFFFF',
-        size: 140,
+        size: 144,
       });
     } catch (e) {
       console.error('QR generation failed:', e);
@@ -369,6 +370,11 @@ export const ReservationReceiptModal: React.FC = () => {
   const handleGoToLiveSession = () => {
     handleClose();
     setView('charging');
+  };
+
+  const handleGoToLiveQueue = () => {
+    handleClose();
+    setView('queue');
   };
 
   const handleViewReservation = () => {
@@ -726,24 +732,35 @@ export const ReservationReceiptModal: React.FC = () => {
             isComplete ? 'opacity-100 translate-y-0' : 'opacity-40 pointer-events-none'
           }`}
         >
-          {/* Primary Action: Go to Live Session */}
-          <button
-            onClick={handleGoToLiveSession}
-            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all hover:scale-[1.01] cursor-pointer"
-          >
-            <Zap className="w-4 h-4 fill-slate-950" />
-            <span>GO TO LIVE SESSION</span>
-            <ArrowRight className="w-4 h-4 stroke-[3]" />
-          </button>
+          {/* Primary Action: Go to Live Queue or Live Session */}
+          {reservation?.status === 'QUEUED' || (activeQueue && activeQueue > 1) ? (
+            <button
+              onClick={handleGoToLiveQueue}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-300 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.4)] transition-all hover:scale-[1.01] cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-slate-950" />
+              <span>GO TO LIVE QUEUE (#{activeQueue || 2} IN LINE)</span>
+              <ArrowRight className="w-4 h-4 stroke-[3]" />
+            </button>
+          ) : (
+            <button
+              onClick={handleGoToLiveSession}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all hover:scale-[1.01] cursor-pointer"
+            >
+              <Zap className="w-4 h-4 fill-slate-950" />
+              <span>GO TO LIVE SESSION</span>
+              <ArrowRight className="w-4 h-4 stroke-[3]" />
+            </button>
+          )}
 
-          {/* Secondary Actions Row: View Reservation & Back to Cockpit */}
+          {/* Secondary Actions Row: Live Queue / Session Toggle & Back to Cockpit */}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={handleViewReservation}
+              onClick={reservation?.status === 'QUEUED' || (activeQueue && activeQueue > 1) ? handleGoToLiveSession : handleGoToLiveQueue}
               className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
-              <span>View Reservation</span>
+              <span>{reservation?.status === 'QUEUED' || (activeQueue && activeQueue > 1) ? 'Live Session' : 'Live Queue'}</span>
             </button>
 
             <button

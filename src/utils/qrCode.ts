@@ -329,9 +329,11 @@ export function generateQRCodeMatrix(text: string): boolean[][] {
 
   // 8. Write Format Information (Level M = 00, Mask 0 = 000 -> Data bits 00000)
   // Format string for M, Mask 0 with BCH(15, 5) and XOR mask 0x5412 is:
-  // 1 0 1 0 1 0 0 0 0 0 1 0 0 1 0
+  // 1 0 1 0 1 0 0 0 0 0 1 0 0 1 0 (MSB to LSB: bit 14 down to bit 0)
   const formatBits = [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0];
 
+  // Top-left format bits: (8,0)=bit14, (8,1)=bit13, (8,2)=bit12, (8,3)=bit11, (8,4)=bit10, (8,5)=bit9,
+  // (8,7)=bit8, (8,8)=bit7, (7,8)=bit6, (5,8)=bit5, (4,8)=bit4, (3,8)=bit3, (2,8)=bit2, (1,8)=bit1, (0,8)=bit0
   const formatCoordsTopLeft: [number, number][] = [
     [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5],
     [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]
@@ -341,10 +343,14 @@ export function generateQRCodeMatrix(text: string): boolean[][] {
     matrix[r][c] = formatBits[i] === 1;
   }
 
+  // Split format bits:
+  // (8, N-1)=bit0, (8, N-2)=bit1, (8, N-3)=bit2, (8, N-4)=bit3, (8, N-5)=bit4, (8, N-6)=bit5, (8, N-7)=bit6, (8, N-8)=bit7
+  // (N-7, 8)=bit8, (N-6, 8)=bit9, (N-5, 8)=bit10, (N-4, 8)=bit11, (N-3, 8)=bit12, (N-2, 8)=bit13, (N-1, 8)=bit14
   const formatCoordsSplit: [number, number][] = [
     [N - 1, 8], [N - 2, 8], [N - 3, 8], [N - 4, 8], [N - 5, 8], [N - 6, 8], [N - 7, 8],
     [8, N - 8], [8, N - 7], [8, N - 6], [8, N - 5], [8, N - 4], [8, N - 3], [8, N - 2], [8, N - 1]
   ];
+  // formatCoordsSplit index 0 is (N-1, 8) which is bit 14, down to index 14 which is (8, N-1) which is bit 0
   for (let i = 0; i < 15; i++) {
     const [r, c] = formatCoordsSplit[i];
     matrix[r][c] = formatBits[i] === 1;
@@ -358,7 +364,7 @@ export function generateQRCodeSVG(
   options: QRCodeOptions = {}
 ): string {
   const {
-    padding = 2,
+    padding = 4,
     fgColor = '#090F1C',
     bgColor = '#FFFFFF',
     size = 200,

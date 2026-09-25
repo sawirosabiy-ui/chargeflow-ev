@@ -129,13 +129,31 @@ export const AheSessionModal: React.FC<AheSessionModalProps> = ({
 
               <div className="flex items-center justify-between">
                 <span className={isCream ? 'text-slate-600' : 'text-slate-400'}>Energy Consumption Cost:</span>
-                <span className="font-mono font-bold">{costEtb.toFixed(2)} ETB</span>
+                {batterySoc >= 90 || costEtb === 0 ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-slate-400 line-through">{(energyKwh * 19.5).toFixed(2)} ETB</span>
+                    <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400 font-bold text-[10px] border border-teal-500/30">
+                      0.00 ETB (FREE TOP-OFF)
+                    </span>
+                  </div>
+                ) : (
+                  <span className="font-mono font-bold">{costEtb.toFixed(2)} ETB</span>
+                )}
               </div>
+
+              {(batterySoc >= 90 || costEtb === 0) && (
+                <div className="p-2 rounded-xl bg-teal-500/10 border border-teal-500/25 text-teal-300 text-[11px] leading-tight flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 shrink-0 text-teal-400" />
+                  <span>
+                    <strong>Courtesy Charge Exemption:</strong> Vehicles charged to ≥90% are exempt from energy usage fees to protect cell longevity.
+                  </span>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-white/10 flex items-center justify-between text-sm">
                 <span className="font-bold">Charging Payment Due:</span>
                 <span className="font-mono font-black text-emerald-400 text-base">
-                  {costEtb.toFixed(2)} ETB
+                  {(batterySoc >= 90 || costEtb === 0) ? '0.00 ETB' : `${costEtb.toFixed(2)} ETB`}
                 </span>
               </div>
             </div>
@@ -143,27 +161,34 @@ export const AheSessionModal: React.FC<AheSessionModalProps> = ({
             {/* 4. Payment Method Selector */}
             <div className="space-y-1.5">
               <label className="text-[10px] uppercase tracking-wider font-bold opacity-70">
-                Select Payment Method
+                {(batterySoc >= 90 || costEtb === 0) ? 'Confirmation Mode' : 'Select Payment Method'}
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['Telebirr', 'CBE Birr', 'Chapa', 'Wallet'] as const).map((method) => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => setSelectedMethod(method)}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                      selectedMethod === method
-                        ? 'bg-teal-500/20 border-teal-400 text-teal-300 shadow-[0_0_12px_rgba(45,212,191,0.25)]'
-                        : isCream
-                        ? 'bg-white border-stone-200 text-slate-700 hover:bg-stone-50'
-                        : 'bg-slate-900/80 border-white/5 text-slate-300 hover:bg-slate-800'
-                    }`}
-                  >
-                    <span>{method}</span>
-                    {selectedMethod === method && <Check className="w-3.5 h-3.5 text-teal-400" />}
-                  </button>
-                ))}
-              </div>
+              {(batterySoc >= 90 || costEtb === 0) ? (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold flex items-center justify-between">
+                  <span>✓ 100% Free Courtesy Discharge &amp; Release</span>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {(['Telebirr', 'CBE Birr', 'Chapa', 'Wallet'] as const).map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setSelectedMethod(method)}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                        selectedMethod === method
+                          ? 'bg-teal-500/20 border-teal-400 text-teal-300 shadow-[0_0_12px_rgba(45,212,191,0.25)]'
+                          : isCream
+                          ? 'bg-white border-stone-200 text-slate-700 hover:bg-stone-50'
+                          : 'bg-slate-900/80 border-white/5 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{method}</span>
+                      {selectedMethod === method && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {errorMsg && (
@@ -180,7 +205,13 @@ export const AheSessionModal: React.FC<AheSessionModalProps> = ({
               className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all hover:scale-[1.01] cursor-pointer"
             >
               <CreditCard className="w-4 h-4" />
-              <span>{isProcessing ? 'Processing Payment...' : `Pay & Finish (${costEtb.toFixed(2)} ETB)`}</span>
+              <span>
+                {isProcessing
+                  ? 'Processing...'
+                  : (batterySoc >= 90 || costEtb === 0)
+                  ? 'Complete & Release Bay (0.00 ETB - Free)'
+                  : `Pay & Finish (${costEtb.toFixed(2)} ETB)`}
+              </span>
             </button>
           </>
         ) : (

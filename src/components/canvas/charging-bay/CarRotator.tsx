@@ -75,16 +75,17 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
       isDragging.current = true;
       activePointerId.current = e.pointerId;
       lastClientX.current = e.clientX;
+      lastClientY.current = e.clientY;
       lastTimestamp.current = performance.now();
       
       // Stop all momentum instantly so car is locked to finger
       velocity.current = 0;
       targetRotY.current = currentRotY.current;
 
-      try {
-        canvas.setPointerCapture(e.pointerId);
-      } catch {
-        // Fallback if browser doesn't support pointer capture
+      if (e.pointerType === 'mouse') {
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {}
       }
 
       if (onUserInteraction) {
@@ -97,10 +98,24 @@ export const CarRotator: React.FC<CarRotatorProps> = ({
       if (!isDragging.current) return;
       if (activePointerId.current !== null && e.pointerId !== activePointerId.current) return;
 
+      const deltaX = e.clientX - lastClientX.current;
+      const deltaY = e.clientY - lastClientY.current;
+
+      // For touch pointers: If user is swiping vertically, release to native page scroll
+      if (e.pointerType === 'touch') {
+        if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 6) {
+          isDragging.current = false;
+          try {
+            canvas.releasePointerCapture(e.pointerId);
+          } catch {}
+          return;
+        }
+      }
+
       const now = performance.now();
       const dt = Math.max(1, now - lastTimestamp.current);
-      const deltaX = e.clientX - lastClientX.current;
       lastClientX.current = e.clientX;
+      lastClientY.current = e.clientY;
       lastTimestamp.current = now;
 
       if (deltaX !== 0) {

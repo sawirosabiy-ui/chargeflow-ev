@@ -31,7 +31,7 @@ export const App: React.FC = () => {
   const isFullScreenMap = useChargeFlowStore((s) => s.isFullScreenMap);
   const checkReservationExpiration = useChargeFlowStore((s) => s.checkReservationExpiration);
 
-  // Global background charging ticker across all views
+  // Background charging ticker
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (chargingStatus === "CHARGING") {
@@ -43,15 +43,6 @@ export const App: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [chargingStatus, tickChargingSession]);
-
-  // Periodic 1-hour reservation expiration watchdog
-  useEffect(() => {
-    checkReservationExpiration();
-    const timer = setInterval(() => {
-      checkReservationExpiration();
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [checkReservationExpiration]);
 
   // Fullscreen Welcome / Showroom Landing
   if (currentView === "welcome") {

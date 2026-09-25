@@ -125,7 +125,7 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
       </div>
 
       {/* 2. Interactive Three.js 3D Layer: Stationary Stage & Car-Only 360 Rotation */}
-      <div className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing touch-none">
+      <div className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing touch-pan-y">
         <Canvas
           className="w-full h-full"
           camera={{

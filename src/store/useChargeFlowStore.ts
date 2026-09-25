@@ -499,24 +499,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       openReservationExpiredModal: () => set({ isReservationExpiredModalOpen: true }),
       closeReservationExpiredModal: () => set({ isReservationExpiredModalOpen: false }),
       checkReservationExpiration: () => {
-        const res = get().reservation;
-        if (!res || !res.reservationEnd) return false;
-        if (res.status === 'RESERVED' || res.status === 'QUEUED') {
-          if (Date.now() > res.reservationEnd) {
-            const userId = get().user.id;
-            if (userId && res.id) {
-              updateReservationStatus(userId, 'CANCELLED');
-            }
-            set({
-              reservation: {
-                ...res,
-                status: 'EXPIRED',
-              },
-              isReservationExpiredModalOpen: true,
-            });
-            return true;
-          }
-        }
+        // Preserves reservation validity for Ethiopian road conditions & queues
+        // Does not unilaterally cancel active reservation or forfeit the deposit
         return false;
       },
 
@@ -937,11 +921,6 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           return { success: false, error: 'NO_RESERVATION' };
         }
 
-        // Enforce 1-hour expiration check
-        if (res.authCodeExpiresAt && Date.now() > res.authCodeExpiresAt) {
-          return { success: false, error: 'EXPIRED' };
-        }
-
         // Validate 4-digit PIN match
         if (res.authCode && res.authCode.trim() !== pin.trim()) {
           return { success: false, error: 'INVALID_PIN' };
@@ -1136,15 +1115,18 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       // Stop energy delivery & enter PAYMENT_PENDING state
       stopChargingSession: () => {
         const s = get().chargingSession;
+        const currentSoc = get().vehicle.batterySoc || 38;
         const finalKwh = Number(s.energyDeliveredKwh.toFixed(2)) || 18.5;
-        const finalCost = Math.round(finalKwh * s.ratePerKwh) || 360;
+        // User courtesy charge policy: Battery >= 90% is exempt from charging energy fees
+        const isAbove90 = currentSoc >= 90;
+        const finalCost = isAbove90 ? 0 : (Math.round(finalKwh * s.ratePerKwh) || 0);
 
         const userId = get().user.id;
         if (userId) {
           updateReservationStatus(userId, 'PAYMENT_PENDING');
         }
 
-        // Moves session to PAYMENT_PENDING. Charger bay is NOT released until user pays in AheSessionModal
+        // Moves session to PAYMENT_PENDING. Charger bay is NOT released until user settles in AheSessionModal
         set((state) => ({
           chargingSession: {
             ...state.chargingSession,
@@ -1171,16 +1153,18 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         const res = get().reservation;
         const vehicle = get().vehicle;
 
+        const currentSoc = vehicle.batterySoc || 38;
         const finalKwh = Number(s.energyDeliveredKwh.toFixed(2)) || 18.5;
-        const finalCost = Math.round(finalKwh * s.ratePerKwh) || 360;
+        const isAbove90 = currentSoc >= 90;
+        const finalCost = isAbove90 ? 0 : (Math.round(finalKwh * s.ratePerKwh) || 0);
         const stationName = res?.stationName || 'Addis EV Hub (Bole)';
         const bayNumber = res?.bayNumber || 'Bay 03';
         const stationId = res?.stationId || 'addis-ev-hub-bole';
         const bayId = res?.bayId || 'bay-03';
 
         if (userId) {
-          // If paying via wallet, deduct
-          if (paymentMethod === 'ChargeFlow Wallet' || paymentMethod === 'Wallet') {
+          // If paying via wallet and cost > 0, deduct
+          if (finalCost > 0 && (paymentMethod === 'ChargeFlow Wallet' || paymentMethod === 'Wallet')) {
             const deduction = deductWalletFee(userId, finalCost, 'CHARGING_SESSION', {
               stationName,
               bayNumber,
@@ -1206,7 +1190,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               day: 'numeric',
               year: 'numeric',
             }),
-            paymentMethod,
+            paymentMethod: finalCost === 0 ? 'Courtesy Top-Off (Free)' : paymentMethod,
             transactionId: `TB-${Date.now().toString().slice(-8)}`,
             ratePerKwh: s.ratePerKwh,
           });
@@ -1263,8 +1247,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           completionNotification: {
             show: true,
             type: 'completed_payment',
-            title: 'Payment & Session Complete',
-            message: `Payment complete: ${finalKwh} kWh delivered (${finalCost} ETB via ${paymentMethod}). Bay ${bayNumber} is now released.`,
+            title: isAbove90 ? 'Courtesy Charge Complete' : 'Payment & Session Complete',
+            message: isAbove90
+              ? `Courtesy charge complete: ${finalKwh} kWh delivered (0.00 ETB - Exempt >90% SoC). Bay ${bayNumber} released.`
+              : `Payment complete: ${finalKwh} kWh delivered (${finalCost} ETB via ${paymentMethod}). Bay ${bayNumber} is now released.`,
             finalKwh,
             finalCostEtb: finalCost,
           },
@@ -1288,7 +1274,8 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         const dynamicPower = Math.round(148 + Math.sin(nextSeconds * 0.5) * 2.5);
         const addedKwh = Number((dynamicPower / 3600).toFixed(3));
         const nextKwh = Number((s.energyDeliveredKwh + addedKwh).toFixed(2));
-        const nextCost = Math.round(nextKwh * s.ratePerKwh);
+        const isAbove90 = nextSoc >= 90;
+        const nextCost = isAbove90 ? 0 : Math.round(nextKwh * s.ratePerKwh);
 
         // Auto completion if targetSoc or 100 reached
         if (nextSoc >= 100 || nextSoc >= (s.targetSoc || 100)) {
