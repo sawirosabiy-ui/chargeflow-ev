@@ -265,7 +265,7 @@ export interface ChargeFlowState {
     bayId: string,
     slotTime?: string,
     date?: string
-  ) => { success: boolean; error?: string; isQueued?: boolean; queuePosition?: number };
+  ) => { success: boolean; error?: string; isQueued?: boolean; queuePosition?: number; receipt?: any };
   settleChargingPayment: (paymentMethod?: string) => { success: boolean; error?: string };
   setReadyToCharge: () => void;
   cancelActiveReservation: () => void;
@@ -323,7 +323,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       receiptModal: null,
       openReceiptModal: (data) =>
         set((state) => {
-          if (data) return { receiptModal: { ...data, isOpen: true } };
+          if (data) return { receiptModal: { ...data, isOpen: true, initialAnimation: data.initialAnimation ?? true } };
           const res = state.reservation || (state.user.id ? getUserActiveReservation(state.user.id) : null);
           const v = state.vehicle;
           const authCode = res?.authCode || '8492';
@@ -345,7 +345,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
               slotTime: res?.slotTime || '18:00 - 18:30',
               queuePosition: res?.queuePosition,
               estimatedEnergyCostEtb: Math.round(18.5 * 19.50),
-              initialAnimation: false,
+              initialAnimation: true,
               authCode,
               authCodeExpiresAt,
             },
@@ -870,11 +870,11 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
           },
           reservation: newReservation,
           receiptModal: generatedReceipt,
-          currentView: isOccupied ? 'queue' : 'reservation',
         });
 
         return {
           success: true,
+          receipt: generatedReceipt,
           isQueued: isOccupied,
           queuePosition: isOccupied ? newReservation.queuePosition : undefined,
         };

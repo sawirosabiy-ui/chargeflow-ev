@@ -162,7 +162,7 @@
 }
 
 .ticket-feed-motion {
-  animation: ticketFeedUp 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: ticketFeedUp 3.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .laser-aperture {
@@ -170,7 +170,7 @@
 }
 
 .laser-scan-sweep {
-  animation: laserScanSweep 3.8s ease-out forwards;
+  animation: laserScanSweep 3.2s ease-out forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

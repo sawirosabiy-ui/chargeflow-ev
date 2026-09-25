@@ -163,14 +163,14 @@ export const ReservationView: React.FC = () => {
           if (res.success) {
             setPaymentStage('success');
             setReservationError('');
-            // Show explicit Payment Success stage for 700ms before triggering receipt simulation
+            // Show explicit Payment Success stage for 800ms before triggering receipt simulation
             setTimeout(() => {
               setIsProcessingPayment(false);
               setShowPinModal(false);
               setPin('');
               setPaymentStage('input');
-              openReceiptModal();
-            }, 700);
+              openReceiptModal({ ...(res.receipt || {}), initialAnimation: true });
+            }, 800);
           } else {
             setIsProcessingPayment(false);
             setPaymentStage('input');

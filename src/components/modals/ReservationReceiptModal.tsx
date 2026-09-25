@@ -75,7 +75,7 @@ export const ReservationReceiptModal: React.FC = () => {
         ctx.resume();
       }
 
-      const feedDuration = 3.6; // active thermal printing duration (sec)
+      const feedDuration = 3.2; // active thermal printing duration (sec)
       const now = ctx.currentTime;
       const sampleRate = ctx.sampleRate;
 
@@ -154,7 +154,7 @@ export const ReservationReceiptModal: React.FC = () => {
       motorOsc.stop(now + feedDuration + 0.3);
       headOsc.stop(now + feedDuration + 0.3);
 
-      // 4. Mechanical Cutter Snip at Completion (3.6s)
+      // 4. Mechanical Cutter Snip at Completion (3.2s)
       const cutterTime = now + feedDuration;
       const cutterNoise = ctx.createBufferSource();
       const cutterSize = Math.floor(sampleRate * 0.08);
@@ -256,16 +256,16 @@ export const ReservationReceiptModal: React.FC = () => {
     // Start authentic receipt printer sound
     startReceiptPrinterSound();
 
-    // Slower, deliberate mechanical feed phase (0 - 3600ms)
+    // Slower, deliberate mechanical feed phase (0 - 3200ms)
     const settleTimer = setTimeout(() => {
       setAnimationPhase('settling');
-    }, 3600);
+    }, 3200);
 
-    // Final Confirmed State with Checkmark & Controls (3900ms)
+    // Final Confirmed State with Checkmark & Controls (3450ms)
     const confirmedTimer = setTimeout(() => {
       setAnimationPhase('confirmed');
       playConfirmationChime();
-    }, 3900);
+    }, 3450);
 
     return () => {
       clearTimeout(settleTimer);
@@ -285,11 +285,11 @@ export const ReservationReceiptModal: React.FC = () => {
     setAnimationPhase('feeding');
     setHasPlayedChime(false);
     startReceiptPrinterSound();
-    setTimeout(() => setAnimationPhase('settling'), 3600);
+    setTimeout(() => setAnimationPhase('settling'), 3200);
     setTimeout(() => {
       setAnimationPhase('confirmed');
       playConfirmationChime();
-    }, 3900);
+    }, 3450);
   };
 
   const handleClose = () => {
