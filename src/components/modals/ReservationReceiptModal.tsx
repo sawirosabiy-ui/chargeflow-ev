@@ -459,31 +459,31 @@ export const ReservationReceiptModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Confirmation Stage: Emerges at the End of Print Feed */}
+        {/* Status Confirmation Stage: Emerges with Print Feed */}
         <div className="px-5 pt-3 pb-2 text-center transition-all duration-300 shrink-0 z-20">
           <div className="flex items-center justify-center gap-2 mb-1">
             <div 
               className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-500 ${
                 isComplete 
                   ? 'bg-emerald-500/20 border border-emerald-400/60 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-100'
-                  : 'bg-teal-500/10 border border-teal-500/20 text-teal-300 scale-95 animate-pulse'
+                  : 'bg-teal-500/20 border border-teal-400/50 text-teal-300 scale-100 animate-pulse'
               }`}
             >
               <CheckCircle2 className={`w-4 h-4 stroke-[2.5] ${isComplete ? 'animate-in zoom-in-50 duration-300' : ''}`} />
             </div>
             <h2 className="text-sm sm:text-base font-black tracking-wider uppercase text-white font-mono">
-              {isComplete ? 'RESERVATION CONFIRMED' : 'PRINTING DIGITAL RECEIPT...'}
+              {isComplete ? 'RESERVATION CONFIRMED • 50 ETB PAID' : 'PRINTING DIGITAL RECEIPT PASS...'}
             </h2>
           </div>
-          <p className="text-[11px] text-slate-400 font-sans">
-            {isComplete ? 'Your charging slot is secured.' : 'Thermal head feeding • Stepper motor active'}
+          <p className="text-[11px] text-slate-300 font-sans">
+            {isComplete ? 'Your charging slot is secured. Pass is active for 1 hour.' : 'Dispensing thermal ticket • Laser aperture active'}
           </p>
         </div>
 
         {/* ========================================================================= */}
         {/* THE DIGITAL TICKET DISPENSER & UPWARD "FEED/PRINT" MOTION CONTAINER       */}
         {/* ========================================================================= */}
-        <div className="relative px-4 sm:px-6 py-2 overflow-hidden flex-1">
+        <div className="relative px-3 sm:px-5 py-2 overflow-hidden flex-1 min-h-[460px]">
           {/* Subtle Top Digital Emitter Slit */}
           <div className="relative z-10 w-full mb-1">
             <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-teal-400 to-transparent laser-aperture" />
@@ -495,8 +495,8 @@ export const ReservationReceiptModal: React.FC = () => {
             onClick={!isComplete ? handleSkipAnimation : undefined}
             className={`relative rounded-2xl border transition-all duration-300 ${
               isCream
-                ? 'bg-white border-amber-900/15 text-slate-900 shadow-md'
-                : 'bg-gradient-to-b from-[#0E1626] via-[#09101C] to-[#050912] border-white/10 text-slate-100 shadow-[0_10px_35px_rgba(0,0,0,0.8)]'
+                ? 'bg-white border-amber-900/20 text-slate-900 shadow-xl'
+                : 'bg-[#0E172A] border-teal-500/40 text-slate-100 shadow-[0_15px_45px_rgba(0,0,0,0.85)]'
             } ${!isComplete ? 'ticket-feed-motion cursor-pointer' : ''}`}
           >
             {/* Transient Laser Scanline during upward print */}

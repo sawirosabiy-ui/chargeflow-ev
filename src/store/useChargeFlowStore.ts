@@ -649,6 +649,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
                 queuePosition: activeRes.queuePosition,
                 arrivalDeadlineMin: activeRes.arrivalDeadlineMin,
                 pinConfirmed: activeRes.pinConfirmed,
+                authCode: activeRes.authCode,
+                authCodeExpiresAt: activeRes.authCodeExpiresAt,
+                reservationStart: activeRes.reservationStart,
+                reservationEnd: activeRes.reservationEnd,
               }
             : null,
         });

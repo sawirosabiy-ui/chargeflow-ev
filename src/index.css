@@ -110,65 +110,50 @@
 /* Digital Charging Reservation Ticket Feed & Emitter Animations */
 @keyframes ticketFeedUp {
   0% {
-    transform: translateY(105%);
-    opacity: 0.2;
-  }
-  12% {
-    transform: translateY(85%);
-    opacity: 0.8;
-  }
-  14% {
-    transform: translateY(83%);
-  }
-  30% {
-    transform: translateY(64%);
-    opacity: 0.9;
-  }
-  33% {
-    transform: translateY(62%);
-  }
-  52% {
-    transform: translateY(42%);
-    opacity: 0.96;
-  }
-  55% {
-    transform: translateY(40%);
-  }
-  74% {
-    transform: translateY(18%);
+    transform: translateY(14%) scale(0.985);
     opacity: 1;
   }
-  76% {
-    transform: translateY(16%);
+  15% {
+    transform: translateY(11%) scale(0.99);
+    opacity: 1;
   }
-  92% {
-    transform: translateY(-1.2%);
+  30% {
+    transform: translateY(8%) scale(0.992);
+  }
+  50% {
+    transform: translateY(4.5%) scale(0.996);
+  }
+  70% {
+    transform: translateY(1.5%) scale(1);
+  }
+  88% {
+    transform: translateY(-0.8%) scale(1);
   }
   100% {
-    transform: translateY(0%);
+    transform: translateY(0%) scale(1);
     opacity: 1;
   }
 }
 
 @keyframes laserAperturePulse {
   0%, 100% {
-    opacity: 0.45;
-    box-shadow: 0 0 10px rgba(45, 212, 191, 0.4);
+    opacity: 0.6;
+    box-shadow: 0 0 12px rgba(45, 212, 191, 0.5);
   }
   50% {
     opacity: 1;
-    box-shadow: 0 0 20px rgba(45, 212, 191, 0.9), 0 0 35px rgba(16, 185, 129, 0.6);
+    box-shadow: 0 0 25px rgba(45, 212, 191, 0.95), 0 0 40px rgba(16, 185, 129, 0.7);
   }
 }
 
 @keyframes laserScanSweep {
   0% {
     top: 0%;
-    opacity: 0.85;
+    opacity: 0.95;
   }
-  90% {
-    top: 98%;
-    opacity: 0.6;
+  85% {
+    top: 96%;
+    opacity: 0.7;
   }
   100% {
     top: 100%;
@@ -177,7 +162,7 @@
 }
 
 .ticket-feed-motion {
-  animation: ticketFeedUp 3.8s cubic-bezier(0.18, 0.8, 0.22, 1) forwards;
+  animation: ticketFeedUp 2.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .laser-aperture {

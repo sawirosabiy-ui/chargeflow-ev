@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -90,6 +90,7 @@ export const ReservationView: React.FC = () => {
   const reservation = useChargeFlowStore((s) => s.reservation);
   const setView = useChargeFlowStore((s) => s.setView);
   const confirmReservation = useChargeFlowStore((s) => s.confirmReservation);
+  const cancelActiveReservation = useChargeFlowStore((s) => s.cancelActiveReservation);
   const topupWalletBalance = useChargeFlowStore((s) => s.topupWalletBalance);
   const openAuthModal = useChargeFlowStore((s) => s.openAuthModal);
   const openReceiptModal = useChargeFlowStore((s) => s.openReceiptModal);
@@ -111,8 +112,21 @@ export const ReservationView: React.FC = () => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStage, setPaymentStage] = useState<'input' | 'authorizing' | 'success'>('input');
   const [showFullBatteryWarning, setShowFullBatteryWarning] = useState(false);
   const [hasBypassedFullBatteryWarning, setHasBypassedFullBatteryWarning] = useState(false);
+
+  // Clean up any stale or expired reservations (> 1 hour)
+  useEffect(() => {
+    const checkExpiration = () => {
+      if (reservation?.authCodeExpiresAt && Date.now() > reservation.authCodeExpiresAt) {
+        cancelActiveReservation();
+      }
+    };
+    checkExpiration();
+    const timer = setInterval(checkExpiration, 10000);
+    return () => clearInterval(timer);
+  }, [reservation, cancelActiveReservation]);
 
   const dates = [
     { id: 'Today, May 16', label: 'Today', sub: 'May 16' },
@@ -142,18 +156,27 @@ export const ReservationView: React.FC = () => {
       setPin(nextPin);
       if (nextPin.length === 4) {
         setIsProcessingPayment(true);
+        setPaymentStage('authorizing');
         const bayId = selectedBay.toLowerCase().replace(/\s+/g, '-');
         setTimeout(() => {
           const res = confirmReservation('addis-ev-hub-bole', bayId, selectedTimeSlot, selectedDate);
-          setIsProcessingPayment(false);
           if (res.success) {
-            setShowPinModal(false);
-            setPin('');
+            setPaymentStage('success');
             setReservationError('');
+            // Show explicit Payment Success stage for 700ms before triggering receipt simulation
+            setTimeout(() => {
+              setIsProcessingPayment(false);
+              setShowPinModal(false);
+              setPin('');
+              setPaymentStage('input');
+              openReceiptModal();
+            }, 700);
           } else {
+            setIsProcessingPayment(false);
+            setPaymentStage('input');
             setReservationError(res.error || 'Failed to complete reservation');
           }
-        }, 350);
+        }, 300);
       }
     }
   };
@@ -220,7 +243,7 @@ export const ReservationView: React.FC = () => {
       </div>
 
       {/* ACTIVE CONFIRMED RESERVATION BANNER */}
-      {reservation && (
+      {reservation && (!reservation.authCodeExpiresAt || Date.now() <= reservation.authCodeExpiresAt) && (
         <div className="p-5 rounded-3xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-emerald-500/10 border border-emerald-500/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -1011,83 +1034,108 @@ export const ReservationView: React.FC = () => {
 
       {/* 4-Digit PIN Security Modal */}
       {showPinModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-[#111827] border border-emerald-500/30 rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 shadow-2xl">
-            <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-                <Lock className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-white">{t.enterPinTitle}</h3>
-              <p className="text-xs text-slate-400">
-                {t.confirmBayPinSubtitle} <strong className="text-emerald-400">{user.name}</strong>
-              </p>
-            </div>
-
-            {reservationError && (
-              <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs text-center font-semibold">
-                {reservationError}
-              </div>
-            )}
-            {/* 4-Digit Masked Display */}
-            <div className="flex justify-center gap-3 py-2">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className={`w-12 h-12 rounded-2xl border flex items-center justify-center text-xl font-mono transition-all ${
-                    pin[i]
-                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                      : 'bg-slate-900 border-white/10 text-slate-600'
-                  }`}
-                >
-                  {pin[i] ? '•' : ''}
+            {paymentStage === 'success' ? (
+              <div className="py-6 flex flex-col items-center justify-center text-center space-y-3.5 animate-in zoom-in-95 duration-200">
+                <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 border-2 border-emerald-400 text-emerald-400 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.5)]">
+                  <CheckCircle2 className="w-10 h-10 stroke-[2.5] animate-in zoom-in-50 duration-300" />
                 </div>
-              ))}
-            </div>
-
-            {isProcessingPayment && (
-              <div className="text-center text-xs font-mono text-teal-400 animate-pulse flex items-center justify-center gap-1.5 py-1">
-                <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping"></span>
-                <span>Authorizing 50 ETB & Securing Bay...</span>
+                <div className="space-y-1">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-mono text-[10px] font-black uppercase tracking-wider">
+                    PAYMENT AUTHORIZED
+                  </div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                    Payment Successful!
+                  </h3>
+                  <p className="text-xs text-emerald-300 font-semibold font-mono">
+                    ✓ 50.00 ETB Deducted • {selectedBay} Secured
+                  </p>
+                  <p className="text-[11px] text-slate-400 pt-1 flex items-center justify-center gap-1.5 font-mono">
+                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping"></span>
+                    <span>Dispensing thermal receipt pass &amp; QR...</span>
+                  </p>
+                </div>
               </div>
-            )}
+            ) : (
+              <>
+                <div className="text-center space-y-1">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">{t.enterPinTitle}</h3>
+                  <p className="text-xs text-slate-400">
+                    {t.confirmBayPinSubtitle} <strong className="text-emerald-400">{user.name}</strong>
+                  </p>
+                </div>
 
-            {/* Numeric Keypad */}
-            <div className="grid grid-cols-3 gap-2 text-sm font-mono">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
+                {reservationError && (
+                  <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs text-center font-semibold">
+                    {reservationError}
+                  </div>
+                )}
+                {/* 4-Digit Masked Display */}
+                <div className="flex justify-center gap-3 py-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={`w-12 h-12 rounded-2xl border flex items-center justify-center text-xl font-mono transition-all ${
+                        pin[i]
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                          : 'bg-slate-900 border-white/10 text-slate-600'
+                      }`}
+                    >
+                      {pin[i] ? '•' : ''}
+                    </div>
+                  ))}
+                </div>
+
+                {isProcessingPayment && (
+                  <div className="text-center text-xs font-mono text-teal-400 animate-pulse flex items-center justify-center gap-1.5 py-1">
+                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping"></span>
+                    <span>Authorizing 50 ETB & Securing Bay...</span>
+                  </div>
+                )}
+
+                {/* Numeric Keypad */}
+                <div className="grid grid-cols-3 gap-2 text-sm font-mono">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
+                    <button
+                      key={k}
+                      disabled={isProcessingPayment}
+                      onClick={() => {
+                        if (isProcessingPayment) return;
+                        if (k === 'C') setPin('');
+                        else if (k === '⌫') handleDeletePin();
+                        else handlePinInput(k);
+                      }}
+                      className={`py-3.5 rounded-2xl border text-white font-bold transition-all ${
+                        isProcessingPayment
+                          ? 'opacity-40 cursor-not-allowed bg-slate-900/50 border-white/5'
+                          : 'bg-slate-900 hover:bg-slate-800 border-white/5 hover:border-emerald-500/30 active:scale-95 cursor-pointer'
+                      }`}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+
                 <button
-                  key={k}
                   disabled={isProcessingPayment}
                   onClick={() => {
                     if (isProcessingPayment) return;
-                    if (k === 'C') setPin('');
-                    else if (k === '⌫') handleDeletePin();
-                    else handlePinInput(k);
+                    setShowPinModal(false);
+                    setPin('');
+                    setReservationError('Reservation not completed. Payment was cancelled.');
                   }}
-                  className={`py-3.5 rounded-2xl border text-white font-bold transition-all ${
-                    isProcessingPayment
-                      ? 'opacity-40 cursor-not-allowed bg-slate-900/50 border-white/5'
-                      : 'bg-slate-900 hover:bg-slate-800 border-white/5 hover:border-emerald-500/30 active:scale-95 cursor-pointer'
+                  className={`w-full py-2 text-xs transition-colors ${
+                    isProcessingPayment ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-white cursor-pointer'
                   }`}
                 >
-                  {k}
+                  {t.cancel}
                 </button>
-              ))}
-            </div>
-
-            <button
-              disabled={isProcessingPayment}
-              onClick={() => {
-                if (isProcessingPayment) return;
-                setShowPinModal(false);
-                setPin('');
-                setReservationError('Reservation not completed. Payment was cancelled.');
-              }}
-              className={`w-full py-2 text-xs transition-colors ${
-                isProcessingPayment ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-white cursor-pointer'
-              }`}
-            >
-              {t.cancel}
-            </button>
+              </>
+            )}
           </div>
         </div>
       )}

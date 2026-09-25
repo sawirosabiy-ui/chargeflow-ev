@@ -39,6 +39,7 @@ export const AheChargingCockpit: React.FC = () => {
     openReceiptModal,
     stopChargingSession,
     confirmReservation,
+    cancelActiveReservation,
     setView,
     theme,
     unauthorizedModal,
@@ -111,18 +112,32 @@ export const AheChargingCockpit: React.FC = () => {
 
   const activeReservation = reservation || (user?.id ? getUserActiveReservation(user.id) : null);
 
-  // Sync remaining validity seconds for the 1-hour PIN
+  // Sync remaining validity seconds for the 1-hour PIN & clean up on expiry
   useEffect(() => {
     const expiresAt = activeReservation?.reservationEnd || activeReservation?.authCodeExpiresAt;
-    if (!isPinModalOpen || !expiresAt) return;
+    if (!expiresAt) return;
+    
+    if (Date.now() > expiresAt) {
+      cancelActiveReservation();
+      if (isPinModalOpen) {
+        setIsPinModalOpen(false);
+      }
+      return;
+    }
+
+    if (!isPinModalOpen) return;
     const updateCountdown = () => {
       const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
       setPinRemainingSec(remaining);
+      if (remaining <= 0) {
+        cancelActiveReservation();
+        setIsPinModalOpen(false);
+      }
     };
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [isPinModalOpen, activeReservation?.reservationEnd, activeReservation?.authCodeExpiresAt]);
+  }, [isPinModalOpen, activeReservation?.reservationEnd, activeReservation?.authCodeExpiresAt, cancelActiveReservation]);
 
   const submitPin = (pinToSubmit: string) => {
     const res = verifyAndStartCharging(pinToSubmit);

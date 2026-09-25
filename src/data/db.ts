@@ -464,7 +464,27 @@ const getReservationsMap = (): Record<string, DbReservation | null> => {
 export const getUserActiveReservation = (userId: string): DbReservation | null => {
   if (!userId) return null;
   const resMap = getReservationsMap();
-  return resMap[userId] || null;
+  const res = resMap[userId];
+  if (!res) return null;
+
+  // Check if status is finalized or if 1-hour auth code has expired
+  if (
+    res.status === 'EXPIRED' ||
+    res.status === 'CANCELLED' ||
+    res.status === 'COMPLETED' ||
+    (res.authCodeExpiresAt && Date.now() > res.authCodeExpiresAt)
+  ) {
+    if (res.authCodeExpiresAt && Date.now() > res.authCodeExpiresAt && res.status !== 'EXPIRED') {
+      res.status = 'EXPIRED';
+      resMap[userId] = res;
+      try {
+        localStorage.setItem(DB_RESERVATIONS_KEY, JSON.stringify(resMap));
+      } catch {}
+    }
+    return null;
+  }
+
+  return res;
 };
 
 export const saveUserReservation = (userId: string, reservation: DbReservation): void => {
@@ -505,6 +525,10 @@ export const isBayOccupiedOrReserved = (stationId: string, bayId: string, curren
   for (const [uid, res] of Object.entries(resMap)) {
     if (res && res.stationId === stationId && res.bayId === bayId) {
       if (currentUserId && uid === currentUserId) continue;
+      // If reservation has expired (> 1 hour), it is no longer holding the bay
+      if (res.authCodeExpiresAt && Date.now() > res.authCodeExpiresAt) {
+        continue;
+      }
       if (
         res.status === 'RESERVED' ||
         res.status === 'CHARGING' ||
