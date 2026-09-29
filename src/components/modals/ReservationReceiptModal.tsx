@@ -124,24 +124,22 @@ export const ReservationReceiptModal: React.FC = () => {
     closeReceiptModal();
   };
 
-  if (!receiptModal?.isOpen) return null;
-
   // Bulletproof fallback coercions for all receipt properties
-  const safeReceiptNo = String(receiptModal.receiptNo || `CF-${Date.now().toString().slice(-8)}`);
-  const safeDate = String(receiptModal.date || new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }));
-  const safeStationName = String(receiptModal.stationName || 'Addis EV Hub (Bole)');
-  const safeBayNumber = String(receiptModal.bayNumber || 'Bay 03');
-  const safePowerKw = Number(receiptModal.powerKw || 120);
-  const safeAmountEtb = Number(typeof receiptModal.amountEtb === 'number' ? receiptModal.amountEtb : 50.0);
-  const safeStatus = String(receiptModal.status || 'PAID');
-  const activeResId = String(receiptModal.reservationId || reservation?.id || `RES-${safeReceiptNo.slice(-4)}`);
-  const activeVehicleModel = String(receiptModal.vehicleModel || vehicle?.model || 'BYD Seal AWD');
-  const activePlate = String(receiptModal.vehiclePlate || vehicle?.plate || 'ET-3-A48291');
-  const activeSlot = String(receiptModal.slotTime || reservation?.slotTime || '18:00 - 18:30');
-  const activeQueue = receiptModal.queuePosition ?? reservation?.queuePosition;
-  const estimatedCost = Number(receiptModal.estimatedEnergyCostEtb || 360);
-  const activePin = String(receiptModal.authCode || reservation?.authCode || '8492');
-  const activeExpiresAt = Number(receiptModal.authCodeExpiresAt || reservation?.authCodeExpiresAt || (Date.now() + 60 * 60 * 1000));
+  const safeReceiptNo = String(receiptModal?.receiptNo || `CF-${Date.now().toString().slice(-8)}`);
+  const safeDate = String(receiptModal?.date || new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }));
+  const safeStationName = String(receiptModal?.stationName || 'Addis EV Hub (Bole)');
+  const safeBayNumber = String(receiptModal?.bayNumber || 'Bay 03');
+  const safePowerKw = Number(receiptModal?.powerKw || 120);
+  const safeAmountEtb = Number(typeof receiptModal?.amountEtb === 'number' ? receiptModal.amountEtb : 50.0);
+  const safeStatus = String(receiptModal?.status || 'PAID');
+  const activeResId = String(receiptModal?.reservationId || reservation?.id || `RES-${safeReceiptNo.slice(-4)}`);
+  const activeVehicleModel = String(receiptModal?.vehicleModel || vehicle?.model || 'BYD Seal AWD');
+  const activePlate = String(receiptModal?.vehiclePlate || vehicle?.plate || 'ET-3-A48291');
+  const activeSlot = String(receiptModal?.slotTime || reservation?.slotTime || '18:00 - 18:30');
+  const activeQueue = receiptModal?.queuePosition ?? reservation?.queuePosition;
+  const estimatedCost = Number(receiptModal?.estimatedEnergyCostEtb || 360);
+  const activePin = String(receiptModal?.authCode || reservation?.authCode || '8492');
+  const activeExpiresAt = Number(receiptModal?.authCodeExpiresAt || reservation?.authCodeExpiresAt || (Date.now() + 60 * 60 * 1000));
   
   const expiresTimeString = !isNaN(new Date(activeExpiresAt).getTime())
     ? new Date(activeExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -183,6 +181,8 @@ export const ReservationReceiptModal: React.FC = () => {
       return '';
     }
   }, [qrCodeUrl]);
+
+  if (!receiptModal?.isOpen) return null;
 
   const handleGoToLiveSession = () => {
     handleClose();

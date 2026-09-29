@@ -195,9 +195,9 @@ export const ReservationView: React.FC = () => {
       return;
     }
 
-    // Full battery confirmation gate: check if battery is 100% or >= 98%
-    const currentSoc = vehicle.batterySoc ?? 100;
-    if (currentSoc >= 98 && !hasBypassedFullBatteryWarning) {
+    // Battery threshold gate: Fast charging reservation is restricted when SoC >= 90%
+    const currentSoc = vehicle.batterySoc ?? 38;
+    if (currentSoc >= 90) {
       setShowFullBatteryWarning(true);
       return;
     }
@@ -1143,7 +1143,7 @@ export const ReservationView: React.FC = () => {
         </div>
       )}
 
-      {/* Battery Full Warning Gate Modal */}
+      {/* Battery Threshold Warning Gate Modal (>= 90% SoC) */}
       {showFullBatteryWarning && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
           <div className="bg-[#111827] border border-amber-500/40 rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 shadow-2xl text-center animate-in zoom-in-95 duration-200">
@@ -1153,13 +1153,13 @@ export const ReservationView: React.FC = () => {
 
             <div className="space-y-1.5">
               <h3 className="text-base font-black text-white uppercase tracking-tight">
-                Battery Already Full ({vehicle.batterySoc}%)
+                Battery Above Threshold ({vehicle.batterySoc}%)
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Your <strong className="text-white">{vehicle.brand} {vehicle.model}</strong> battery is currently at <strong className="text-emerald-400">{vehicle.batterySoc}%</strong> charge. High-power DC fast charging cannot deliver fast charge to an already full battery.
+                Your <strong className="text-white">{vehicle.brand} {vehicle.model}</strong> battery is currently at <strong className="text-emerald-400">{vehicle.batterySoc}%</strong>. Fast-charging reservations are only permitted when battery SoC is below 90% to protect cell longevity and avoid unnecessary station congestion.
               </p>
               <p className="text-[11px] text-amber-400 font-medium">
-                Are you sure you want to proceed with reserving {selectedBay}?
+                Please charge only when needed or top up via AC home charging.
               </p>
             </div>
 
@@ -1169,18 +1169,17 @@ export const ReservationView: React.FC = () => {
                 onClick={() => setShowFullBatteryWarning(false)}
                 className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
               >
-                Cancel
+                Close
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setShowFullBatteryWarning(false);
-                  setHasBypassedFullBatteryWarning(true);
-                  setShowPinModal(true);
+                  setView('find_charge');
                 }}
-                className="py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider transition-all shadow-lg cursor-pointer"
+                className="py-3 px-4 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all shadow-lg cursor-pointer"
               >
-                Yes, Reserve
+                Station Hub
               </button>
             </div>
           </div>

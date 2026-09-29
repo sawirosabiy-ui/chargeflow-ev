@@ -260,6 +260,7 @@ export interface ChargeFlowState {
   topupWalletBalance: (amount: number, method?: string) => void;
 
   // Reservation & Charging State Machine
+  canReserveVehicle: (batterySoc?: number) => { allowed: boolean; reason?: string };
   confirmReservation: (
     stationId: string,
     bayId: string,
@@ -752,8 +753,28 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         }
       },
 
+      // Reservation & Charging State Machine
+      canReserveVehicle: (batterySoc?: number) => {
+        const soc = batterySoc !== undefined ? batterySoc : (get().vehicle.batterySoc ?? 38);
+        if (soc >= 90) {
+          return {
+            allowed: false,
+            reason: `Your battery is already above the recommended reservation threshold (90%). Current SoC: ${soc}%. Fast charging reservation is restricted to prevent grid congestion and battery degradation.`,
+          };
+        }
+        return { allowed: true };
+      },
+
       // RESERVATION STATE MACHINE (Mandatory 50 ETB Fee & Anti-Double-Booking Guard)
       confirmReservation: (stationId, bayId, slotTime = '18:00 - 18:30', date = 'Today, May 16') => {
+        const currentSoc = get().vehicle.batterySoc ?? 38;
+        if (currentSoc >= 90) {
+          return {
+            success: false,
+            error: `Reservation blocked: Your vehicle battery is already at ${currentSoc}%. Reservations are restricted when battery SoC is 90% or above.`,
+          };
+        }
+
         const isAuth = get().requireAuth({
           view: 'reservation',
           action: 'confirm_reservation',
@@ -1433,6 +1454,7 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
       name: 'chargeflow-session-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        currentView: state.currentView,
         language: state.language,
         theme: state.theme,
         user: state.user,
@@ -1440,6 +1462,10 @@ export const useChargeFlowStore = create<ChargeFlowState>()(
         wallet: state.wallet,
         reservation: state.reservation,
         history: state.history,
+        chargingSession: state.chargingSession,
+        cockpitCharging: state.cockpitCharging,
+        receiptModal: state.receiptModal,
+        stations: state.stations,
       }),
     }
   )
