@@ -107,32 +107,34 @@
   }
 }
 
+/* Thermal Receipt Tear Edge (Zig-zag perforation) */
+.receipt-tear-edge {
+  background-image: 
+    radial-gradient(circle at 10px 0, transparent 6px, #FFFFFF 6.5px);
+  background-size: 20px 10px;
+  background-repeat: repeat-x;
+  background-position: 0 0;
+}
+
 /* Digital Charging Reservation Ticket Feed & Emitter Animations */
-@keyframes thermalPaperFeed {
+@keyframes thermalPaperPrint {
   0% {
-    transform: translateY(-80%) scale(0.96);
-    opacity: 0.7;
-    filter: brightness(0.92);
-  }
-  15% {
-    transform: translateY(-58%) scale(0.975);
-    opacity: 0.95;
+    transform: translateY(-36px) scale(0.975);
+    opacity: 0.9;
     filter: brightness(0.96);
   }
-  30% {
-    transform: translateY(-40%) scale(0.985);
+  25% {
+    transform: translateY(-24px) scale(0.985);
+    opacity: 0.98;
+  }
+  50% {
+    transform: translateY(-12px) scale(0.992);
     opacity: 1;
   }
-  48% {
-    transform: translateY(-24%) scale(0.992);
+  75% {
+    transform: translateY(-4px) scale(0.998);
   }
-  65% {
-    transform: translateY(-12%) scale(0.996);
-  }
-  80% {
-    transform: translateY(-3%) scale(0.998);
-  }
-  92% {
+  90% {
     transform: translateY(2px) scale(1.002);
   }
   100% {
@@ -160,7 +162,7 @@
   }
   85% {
     top: 96%;
-    opacity: 0.85;
+    opacity: 0.9;
   }
   100% {
     top: 100%;
@@ -174,7 +176,7 @@
 }
 
 .ticket-feed-motion {
-  animation: thermalPaperFeed 3.2s cubic-bezier(0.18, 0.95, 0.32, 1) forwards;
+  animation: thermalPaperPrint 3.2s cubic-bezier(0.18, 0.95, 0.32, 1) forwards;
   transform-origin: top center;
 }
 
@@ -183,7 +185,7 @@
 }
 
 .laser-scan-sweep {
-  animation: laserScanSweep 3.2s cubic-bezier(0.2, 0.8, 0.35, 1) forwards;
+  animation: laserScanSweep 3.2s cubic-bezier(0.18, 0.95, 0.32, 1) forwards;
 }
 
 .print-head-indicator {

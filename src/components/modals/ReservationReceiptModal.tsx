@@ -21,7 +21,7 @@ import {
   Check,
   Users,
   Printer,
-  Radio
+  FileCheck
 } from 'lucide-react';
 import { useChargeFlowStore } from '../../store/useChargeFlowStore';
 import { generateQRCodeSVG } from '../../utils/qrCode';
@@ -34,8 +34,6 @@ export const ReservationReceiptModal: React.FC = () => {
   const setView = useChargeFlowStore((s) => s.setView);
   const vehicle = useChargeFlowStore((s) => s.vehicle);
   const reservation = useChargeFlowStore((s) => s.reservation);
-  const theme = useChargeFlowStore((s) => s.theme);
-  const isCream = theme === 'cream';
 
   // Animation Phase: 'feeding' (active mechanical line feed) -> 'settling' -> 'confirmed' (settled with checkmark & actions)
   const [animationPhase, setAnimationPhase] = useState<'feeding' | 'settling' | 'confirmed'>('feeding');
@@ -128,23 +126,26 @@ export const ReservationReceiptModal: React.FC = () => {
 
   if (!receiptModal?.isOpen) return null;
 
-  // Safe fallback defaults for all receipt properties
-  const safeReceiptNo = receiptModal.receiptNo || `CF-${Date.now().toString().slice(-8)}`;
-  const safeDate = receiptModal.date || new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-  const safeStationName = receiptModal.stationName || 'Addis EV Hub (Bole)';
-  const safeBayNumber = receiptModal.bayNumber || 'Bay 03';
-  const safePowerKw = receiptModal.powerKw || 120;
-  const safeAmountEtb = typeof receiptModal.amountEtb === 'number' ? receiptModal.amountEtb : 50.0;
-  const safeStatus = receiptModal.status || 'PAID';
-  const activeResId = receiptModal.reservationId || reservation?.id || `RES-${safeReceiptNo.slice(-4)}`;
-  const activeVehicleModel = receiptModal.vehicleModel || vehicle?.model || 'BYD Seal AWD';
-  const activePlate = receiptModal.vehiclePlate || vehicle?.plate || 'ET-3-A48291';
-  const activeSlot = receiptModal.slotTime || reservation?.slotTime || '18:00 - 18:30';
+  // Bulletproof fallback coercions for all receipt properties
+  const safeReceiptNo = String(receiptModal.receiptNo || `CF-${Date.now().toString().slice(-8)}`);
+  const safeDate = String(receiptModal.date || new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }));
+  const safeStationName = String(receiptModal.stationName || 'Addis EV Hub (Bole)');
+  const safeBayNumber = String(receiptModal.bayNumber || 'Bay 03');
+  const safePowerKw = Number(receiptModal.powerKw || 120);
+  const safeAmountEtb = Number(typeof receiptModal.amountEtb === 'number' ? receiptModal.amountEtb : 50.0);
+  const safeStatus = String(receiptModal.status || 'PAID');
+  const activeResId = String(receiptModal.reservationId || reservation?.id || `RES-${safeReceiptNo.slice(-4)}`);
+  const activeVehicleModel = String(receiptModal.vehicleModel || vehicle?.model || 'BYD Seal AWD');
+  const activePlate = String(receiptModal.vehiclePlate || vehicle?.plate || 'ET-3-A48291');
+  const activeSlot = String(receiptModal.slotTime || reservation?.slotTime || '18:00 - 18:30');
   const activeQueue = receiptModal.queuePosition ?? reservation?.queuePosition;
-  const estimatedCost = receiptModal.estimatedEnergyCostEtb || 360;
-  const activePin = receiptModal.authCode || reservation?.authCode || '8492';
-  const activeExpiresAt = receiptModal.authCodeExpiresAt || reservation?.authCodeExpiresAt || (Date.now() + 60 * 60 * 1000);
-  const expiresTimeString = new Date(activeExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const estimatedCost = Number(receiptModal.estimatedEnergyCostEtb || 360);
+  const activePin = String(receiptModal.authCode || reservation?.authCode || '8492');
+  const activeExpiresAt = Number(receiptModal.authCodeExpiresAt || reservation?.authCodeExpiresAt || (Date.now() + 60 * 60 * 1000));
+  
+  const expiresTimeString = !isNaN(new Date(activeExpiresAt).getTime())
+    ? new Date(activeExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '1 Hour';
 
   const handleCopyPin = async () => {
     try {
@@ -166,7 +167,6 @@ export const ReservationReceiptModal: React.FC = () => {
   };
 
   const qrCodeUrl = useMemo(() => {
-    // Compact canonical URI for instant camera barcode scanning across iOS & Android Lens
     return `https://chargeflow-ev.com/v?r=${encodeURIComponent(activeResId)}&p=${encodeURIComponent(activePin)}`;
   }, [activeResId, activePin]);
 
@@ -174,9 +174,9 @@ export const ReservationReceiptModal: React.FC = () => {
     try {
       return generateQRCodeSVG(qrCodeUrl, {
         padding: 4,
-        fgColor: '#070C18',
+        fgColor: '#090F1C',
         bgColor: '#FFFFFF',
-        size: 144,
+        size: 140,
       });
     } catch (e) {
       console.error('QR generation failed:', e);
@@ -214,25 +214,20 @@ export const ReservationReceiptModal: React.FC = () => {
   const isComplete = animationPhase === 'confirmed';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-start sm:items-center justify-center p-2.5 sm:p-4 animate-in fade-in select-none overflow-y-auto overscroll-contain py-3 sm:py-6">
-      <div 
-        className={`relative w-full max-w-md mx-auto my-auto rounded-3xl border shadow-2xl transition-all duration-300 flex flex-col max-h-[94vh] overflow-hidden ${
-          isCream
-            ? 'bg-[#FAF7F2] border-amber-900/20 text-slate-900 shadow-[0_25px_60px_rgba(40,20,10,0.25)]'
-            : 'bg-[#070B14]/95 border-teal-500/30 text-white shadow-[0_25px_70px_rgba(0,0,0,0.95)]'
-        }`}
-      >
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 select-none overflow-y-auto">
+      <div className="relative w-full max-w-md mx-auto my-auto rounded-3xl border border-teal-500/40 bg-[#070B14] text-white shadow-[0_25px_80px_rgba(0,0,0,0.95)] flex flex-col max-h-[92vh] overflow-hidden">
+        
         {/* Subtle Background Radial Glow */}
-        <div className="absolute -top-24 -right-24 w-60 h-60 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-60 h-60 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -top-20 -right-20 w-52 h-52 rounded-full bg-teal-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-52 h-52 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
 
         {/* Modal Top Header Bar */}
-        <div className="relative px-4 sm:px-5 pt-3 pb-2 flex items-center justify-between border-b border-white/5 shrink-0 z-30 bg-[#070B14]">
+        <div className="relative px-4 sm:px-5 pt-3.5 pb-2 flex items-center justify-between border-b border-white/10 shrink-0 z-30 bg-[#070B14]">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400">
+            <div className="w-6 h-6 rounded-lg bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300">
               <Printer className="w-3.5 h-3.5" />
             </div>
-            <span className="text-[10px] font-mono font-bold tracking-widest text-teal-400 uppercase">
+            <span className="text-[10px] font-mono font-bold tracking-widest text-teal-300 uppercase">
               CHARGEFLOW POS DISPENSER
             </span>
           </div>
@@ -271,47 +266,46 @@ export const ReservationReceiptModal: React.FC = () => {
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* HARDWARE PRINTER DISPENSER HOUSING (TOP CASING & EMITTER MOUTH)          */}
-        {/* ========================================================================= */}
-        <div className="relative px-3 sm:px-5 pt-2 pb-1 bg-gradient-to-b from-[#0A101D] to-[#060911] border-b border-teal-500/20 shrink-0 z-20">
+        {/* Hardware Printer Top Housing & Emitter Slit */}
+        <div className="relative px-3 sm:px-5 pt-2 pb-2 bg-gradient-to-b from-[#0A101D] to-[#060911] border-b border-teal-500/30 shrink-0 z-20">
           <div className="flex items-center justify-between pb-1.5 text-[9px] font-mono">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <div className="flex items-center gap-2.5">
+              <span className="flex items-center gap-1 text-slate-300 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34D399]"></span>
                 PWR
               </span>
-              <span className="flex items-center gap-1 text-slate-400">
-                <span className={`w-1.5 h-1.5 rounded-full ${!isComplete ? 'bg-cyan-400 print-head-indicator' : 'bg-emerald-400'}`}></span>
+              <span className="flex items-center gap-1 text-slate-300 font-semibold">
+                <span className={`w-1.5 h-1.5 rounded-full ${!isComplete ? 'bg-cyan-400 print-head-indicator shadow-[0_0_6px_#22D3EE]' : 'bg-emerald-400'}`}></span>
                 FEED
               </span>
-              <span className="flex items-center gap-1 text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
-                READY
+              <span className="flex items-center gap-1 text-slate-300 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shadow-[0_0_6px_#2DD4BF]"></span>
+                ONLINE
               </span>
             </div>
-            <div className="text-teal-400 font-bold uppercase tracking-wider flex items-center gap-1">
+            <div className="text-teal-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
               {!isComplete ? (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping"></span>
-                  <span>DISPENSING THERMAL TICKET...</span>
+                  <span>DISPENSING THERMAL PASS...</span>
                 </>
               ) : (
-                <span className="text-emerald-400">✓ TICKET CUT COMPLETE</span>
+                <span className="text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 stroke-[3]" />
+                  <span>DISPENSER CUT COMPLETE</span>
+                </span>
               )}
             </div>
           </div>
 
-          {/* Realistic 3D Inset Printer Dispenser Mouth / Slit */}
-          <div className="relative w-full h-4 rounded-lg bg-[#020408] border border-slate-700/80 shadow-[inset_0_2px_6px_rgba(0,0,0,0.9)] flex items-center justify-center overflow-hidden">
-            {/* Glowing Laser Print-Head Aperture Beam */}
+          {/* 3D Dispenser Mouth / Emitter Slot */}
+          <div className="relative w-full h-3.5 rounded-md bg-[#020408] border border-slate-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.9)] flex items-center justify-center overflow-hidden">
             <div className="absolute inset-x-2 h-[2px] bg-gradient-to-r from-transparent via-teal-400 to-transparent laser-aperture" />
-            <div className="w-3/4 h-[1px] bg-cyan-300/80 shadow-[0_0_8px_#22D3EE]" />
           </div>
         </div>
 
-        {/* Status Confirmation Sub-Banner */}
-        <div className="px-4 py-2 text-center bg-[#070B14]/80 shrink-0 z-20 border-b border-white/5">
+        {/* Status Confirmation Badge Banner */}
+        <div className="px-4 py-2 text-center bg-[#090E1A] shrink-0 z-20 border-b border-white/10">
           <div className="flex items-center justify-center gap-2">
             <div 
               className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${
@@ -331,156 +325,156 @@ export const ReservationReceiptModal: React.FC = () => {
           </p>
         </div>
 
-        {/* ========================================================================= */}
-        {/* TICKET BODY WITH MECHANICAL EXTRUSION / FEED-DOWN ANIMATION               */}
-        {/* ========================================================================= */}
-        <div className="relative px-2.5 sm:px-4 py-2 overflow-y-auto flex-1 overscroll-contain">
+        {/* Scrollable Container with High-Contrast White Thermal Receipt Paper */}
+        <div className="relative px-3 sm:px-5 py-3 overflow-y-auto flex-1 min-h-0 overscroll-contain bg-[#070B14]">
+          
+          {/* ========================================================================= */}
+          {/* AUTHENTIC WHITE THERMAL RECEIPT PASS (HIGH CONTRAST & BEAUTIFUL)          */}
+          {/* ========================================================================= */}
           <div
             ref={ticketRef}
             onClick={!isComplete ? handleSkipAnimation : undefined}
-            className={`relative rounded-2xl border transition-all duration-300 ${
-              isCream
-                ? 'bg-white border-amber-900/20 text-slate-900 shadow-xl'
-                : 'bg-[#0E172A] border-teal-500/40 text-slate-100 shadow-[0_15px_45px_rgba(0,0,0,0.85)]'
-            } ${!isComplete ? 'ticket-feed-motion cursor-pointer' : ''}`}
+            className={`relative rounded-2xl bg-white text-slate-900 border border-slate-200 shadow-[0_15px_50px_rgba(0,0,0,0.6)] transition-all duration-300 overflow-hidden ${
+              !isComplete ? 'ticket-feed-motion cursor-pointer' : ''
+            }`}
           >
             {/* Transient Laser Scanline during thermal print feed */}
             {!isComplete && (
-              <div className="absolute left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-cyan-300 to-transparent laser-scan-sweep pointer-events-none z-30 shadow-[0_0_10px_#22D3EE]" />
+              <div className="absolute left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent laser-scan-sweep pointer-events-none z-30 shadow-[0_0_12px_#22D3EE]" />
             )}
 
-            {/* 1. Ticket Brand Header */}
-            <div className="p-3.5 sm:p-4 border-b border-white/5 flex items-center justify-between">
+            {/* 1. Thermal Header: Brand & Official Verification Stamp */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 rounded-md bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-slate-950 font-black text-xs shadow-sm">
-                    <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                  <div className="w-6 h-6 rounded-lg bg-slate-950 flex items-center justify-center text-teal-400 font-black shadow-sm">
+                    <Zap className="w-3.5 h-3.5 fill-teal-400" />
                   </div>
-                  <span className="font-sans font-black tracking-widest text-xs text-white">CHARGEFLOW</span>
+                  <span className="font-sans font-black tracking-widest text-sm text-slate-950">CHARGEFLOW</span>
                 </div>
-                <div className="text-[9px] font-mono text-teal-400 tracking-wider mt-0.5">
+                <div className="text-[9px] font-mono font-bold text-teal-700 tracking-wider mt-0.5 uppercase">
                   EXCLUSIVE BAY ALLOCATION PASS
                 </div>
               </div>
 
               <div className="text-right font-mono">
-                <div className="text-[10px] font-bold text-slate-300">{safeReceiptNo}</div>
-                <div className="text-[9px] text-slate-400">{safeDate}</div>
+                <div className="text-[11px] font-extrabold text-slate-900">{safeReceiptNo}</div>
+                <div className="text-[9px] text-slate-500 font-semibold">{safeDate}</div>
               </div>
             </div>
 
             {/* 2. Primary Reservation Details Matrix */}
-            <div className="p-3.5 sm:p-4 space-y-3 text-xs font-mono">
-              <div className="grid grid-cols-2 gap-3 pb-2.5 border-b border-white/5">
+            <div className="p-4 space-y-3.5 text-xs font-mono">
+              <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-100">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-sans">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block font-sans">
                     RESERVATION ID
                   </span>
-                  <span className="font-bold text-white text-xs tracking-wider">{activeResId}</span>
+                  <span className="font-black text-slate-900 text-xs tracking-wider">{activeResId}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-sans">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block font-sans">
                     STATUS
                   </span>
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[10px]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 font-black text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
                     {safeStatus}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pb-2.5 border-b border-white/5">
+              <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-100">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-sans flex items-center gap-1">
-                    <Car className="w-3 h-3 text-teal-400" />
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block font-sans flex items-center gap-1">
+                    <Car className="w-3.5 h-3.5 text-teal-600" />
                     VEHICLE
                   </span>
-                  <span className="font-semibold text-white truncate block text-[11px]">{activeVehicleModel}</span>
-                  <span className="text-[10px] text-slate-400">{activePlate}</span>
+                  <span className="font-bold text-slate-900 truncate block text-[11px] mt-0.5">{activeVehicleModel}</span>
+                  <span className="text-[10px] text-slate-600 font-semibold">{activePlate}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-sans flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-teal-400" />
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block font-sans flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-teal-600" />
                     TIME WINDOW
                   </span>
-                  <span className="font-bold text-emerald-400 text-[11px] block">{activeSlot}</span>
-                  <span className="text-[10px] text-slate-400">15 min grace window</span>
+                  <span className="font-black text-emerald-700 text-[11px] block mt-0.5">{activeSlot}</span>
+                  <span className="text-[10px] text-slate-500">15 min grace window</span>
                 </div>
               </div>
 
-              <div className="pb-2.5 border-b border-white/5">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-sans flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-teal-400" />
-                  CHARGING STATION & BAY
+              <div className="pb-3 border-b border-slate-100">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block font-sans flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-teal-600" />
+                  CHARGING STATION &amp; BAY
                 </span>
-                <div className="flex items-baseline justify-between mt-0.5">
-                  <span className="font-bold text-white text-xs">{safeStationName}</span>
-                  <span className="text-[11px] font-black text-teal-400 px-1.5 py-0.5 rounded bg-teal-500/15 border border-teal-500/30">
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className="font-black text-slate-950 text-xs">{safeStationName}</span>
+                  <span className="text-xs font-black text-teal-900 px-2 py-0.5 rounded-md bg-teal-100 border border-teal-300">
                     {safeBayNumber}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-1">
-                  <span>Power: {safePowerKw} kW DC</span>
+                <div className="text-[10px] text-slate-600 flex items-center gap-2 mt-1 font-medium">
+                  <span>Power: {safePowerKw} kW DC Fast</span>
                   <span>•</span>
                   <span>{activeQueue ? `Queue: #${activeQueue}` : 'Direct Bay Access'}</span>
                 </div>
               </div>
 
-              {/* 3. FINANCIAL SEPARATION: RESERVATION FEE VS CHARGING COST */}
-              <div className="pt-1 space-y-2">
-                <div className="text-[9px] font-sans font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                  <Layers className="w-3 h-3 text-teal-400" />
+              {/* 3. Financial Separation Matrix */}
+              <div className="pt-1 space-y-2.5">
+                <div className="text-[9px] font-sans font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-teal-600" />
                   PAYMENT &amp; COST BREAKDOWN
                 </div>
 
-                {/* Section A: Reservation Fee (Paid Now) */}
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
+                {/* Reservation Fee (Paid Now) */}
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-sans font-bold text-emerald-400">RESERVATION FEE</span>
-                      <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 uppercase font-black">
+                      <span className="text-xs font-sans font-black text-emerald-900">RESERVATION FEE</span>
+                      <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 uppercase font-black">
                         PAID NOW
                       </span>
                     </div>
-                    <span className="text-[9px] text-slate-400 block font-sans mt-0.5">
+                    <span className="text-[10px] text-emerald-700 block font-sans mt-0.5">
                       Secures slot &amp; locks dispenser for arrival
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-sm font-black text-emerald-400 font-mono">
+                    <span className="text-base font-black text-emerald-900 font-mono">
                       {safeAmountEtb.toFixed(2)} ETB
                     </span>
                   </div>
                 </div>
 
-                {/* Section B: Estimated Charging Cost (Billed Later) */}
-                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
+                {/* Estimated Energy Cost (Billed Later) */}
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-sans font-semibold text-slate-300">ESTIMATED CHARGING ENERGY</span>
-                      <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-white/10 text-slate-400 uppercase">
+                      <span className="text-xs font-sans font-bold text-slate-800">ESTIMATED CHARGING ENERGY</span>
+                      <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 uppercase font-bold">
                         BILLED LATER
                       </span>
                     </div>
-                    <span className="text-[9px] text-slate-400 block font-sans mt-0.5">
+                    <span className="text-[10px] text-slate-500 block font-sans mt-0.5">
                       ~18.5 kWh @ 19.50 ETB/kWh upon completion
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs font-bold text-slate-300 font-mono">
+                    <span className="text-xs font-black text-slate-800 font-mono">
                       ~{estimatedCost.toFixed(2)} ETB
                     </span>
                   </div>
                 </div>
 
-                <div className="text-[9px] text-slate-400 font-sans leading-tight pl-1">
+                <p className="text-[9px] text-slate-500 font-sans leading-tight pl-1">
                   * Note: The 50 ETB reservation fee holds your bay. Actual energy consumed is billed separately after charging stops.
-                </div>
+                </p>
               </div>
 
-              {/* 3.5 4-DIGIT DISPENSER UNLOCK PIN (VALID FOR 1 HOUR) */}
+              {/* 3.5 4-Digit Dispenser Unlock PIN */}
               <div className="pt-2">
-                <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-b from-teal-500/15 via-emerald-500/10 to-teal-500/5 border-2 border-teal-400/40 shadow-[0_0_25px_rgba(45,212,191,0.2)] text-center space-y-2.5">
+                <div className="p-3.5 rounded-2xl bg-gradient-to-b from-[#090F1C] to-[#040810] text-white border-2 border-teal-400 shadow-lg text-center space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
                       <KeyRound className="w-3.5 h-3.5 text-teal-400" />
@@ -490,8 +484,8 @@ export const ReservationReceiptModal: React.FC = () => {
                       <button
                         type="button"
                         onClick={handleCopyPin}
-                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-teal-400/20 hover:bg-teal-400/30 text-teal-300 border border-teal-400/40 text-[9px] font-mono font-bold transition-all active:scale-95 cursor-pointer shadow"
-                        title="Copy 4-digit PIN to clipboard"
+                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-teal-400/20 hover:bg-teal-400/30 text-teal-300 border border-teal-400/40 text-[9px] font-mono font-bold transition-all active:scale-95 cursor-pointer"
+                        title="Copy PIN"
                       >
                         {copiedPin ? (
                           <>
@@ -512,14 +506,14 @@ export const ReservationReceiptModal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 4 Digit High-Contrast Monospace PIN Boxes */}
-                  <div className="flex items-center justify-center gap-2.5 sm:gap-3 py-1">
-                    {activePin.split('').slice(0, 4).map((digit, idx) => (
+                  {/* 4 Digit Monospace High-Contrast PIN Boxes */}
+                  <div className="flex items-center justify-center gap-3 py-1">
+                    {activePin.slice(0, 4).split('').map((digit, idx) => (
                       <div
                         key={idx}
-                        className="w-11 h-13 sm:w-12 sm:h-14 rounded-xl bg-[#090F1C] border-2 border-teal-400/60 shadow-[inset_0_0_15px_rgba(45,212,191,0.3)] flex items-center justify-center"
+                        className="w-12 h-14 rounded-xl bg-[#0F172A] border-2 border-teal-400/80 shadow-[inset_0_0_12px_rgba(45,212,191,0.4)] flex items-center justify-center"
                       >
-                        <span className="font-mono text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-teal-200 to-emerald-400 tracking-wider">
+                        <span className="font-mono text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-teal-200 to-emerald-400 tracking-wider">
                           {digit}
                         </span>
                       </div>
@@ -527,53 +521,48 @@ export const ReservationReceiptModal: React.FC = () => {
                   </div>
 
                   <p className="text-[10px] text-slate-300 font-sans leading-tight">
-                    Enter this 4-digit PIN at charger dispenser or tap <strong className="text-teal-300">START CHARGING</strong> in Live Session. Code expires in 1 hour.
+                    Enter this 4-digit PIN at charger dispenser or tap <strong className="text-teal-300">START CHARGING</strong> in Live Session.
                   </p>
                 </div>
               </div>
 
-              {/* 4. Realistic Camera-Scannable QR Code */}
-              <div className="pt-2 border-t border-white/10 text-center space-y-2">
-                <div className="p-2.5 bg-white rounded-xl inline-block shadow-lg mx-auto">
+              {/* 4. High Resolution Camera-Scannable QR Code */}
+              <div className="pt-3 border-t border-slate-200 text-center space-y-2">
+                <div className="p-2.5 bg-white border-2 border-slate-200 rounded-2xl inline-block shadow-md mx-auto">
                   {qrSvgString ? (
                     <div
                       className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
                       dangerouslySetInnerHTML={{ __html: qrSvgString }}
                     />
                   ) : (
-                    <div className="w-28 h-28 bg-slate-100 flex items-center justify-center text-slate-500 text-xs">
+                    <div className="w-28 h-28 bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-mono">
                       QR Generated
                     </div>
                   )}
                 </div>
-                <div className="space-y-1">
-                  <div className="text-[10px] font-mono font-bold text-teal-300 uppercase tracking-wider">
+                <div className="space-y-0.5">
+                  <div className="text-[10px] font-mono font-black text-slate-900 uppercase tracking-wider">
                     SCAN TO OPEN LIVE SESSION &amp; VERIFY
                   </div>
-                  <div className="text-[9px] text-slate-400 font-sans max-w-[260px] mx-auto leading-tight">
-                    Scan with any smartphone camera to access station checkout, bay authorization, and unlock status.
+                  <div className="text-[9px] text-slate-500 font-sans max-w-[260px] mx-auto leading-tight">
+                    Scan with any smartphone camera for bay authorization and unlock status.
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Perforated Bottom Micro-Fringe */}
-            <div className="relative h-2 bg-transparent border-t border-dashed border-white/20 flex items-center justify-between px-3">
-              <span className="w-2 h-2 -mt-2 -ml-4 rounded-full bg-[#070B14]"></span>
-              <span className="w-2 h-2 -mt-2 -mr-4 rounded-full bg-[#070B14]"></span>
-            </div>
+            {/* Perforated Jagged Tear Fringe */}
+            <div className="w-full h-3 receipt-tear-edge mt-2" />
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* POST-ANIMATION USER ACTIONS                                               */}
-        {/* ========================================================================= */}
+        {/* Pinned Bottom User Action Buttons */}
         <div 
-          className={`p-3.5 sm:p-4 pt-2 border-t border-white/5 space-y-2 shrink-0 z-30 bg-[#070B14] transition-all duration-300 ${
-            isComplete ? 'opacity-100 translate-y-0' : 'opacity-40 pointer-events-none'
+          className={`p-3.5 sm:p-4 pt-2.5 border-t border-white/10 space-y-2 shrink-0 z-30 bg-[#070B14] transition-all duration-300 ${
+            isComplete ? 'opacity-100 translate-y-0' : 'opacity-50 pointer-events-none'
           }`}
         >
-          {/* Primary Action: Go to Live Queue or Live Session */}
+          {/* Primary Action Button */}
           {reservation?.status === 'QUEUED' || (activeQueue && activeQueue > 1) ? (
             <button
               onClick={handleGoToLiveQueue}
@@ -594,11 +583,11 @@ export const ReservationReceiptModal: React.FC = () => {
             </button>
           )}
 
-          {/* Secondary Actions Row: Live Queue / Session Toggle & Back to Cockpit */}
+          {/* Secondary Actions Row */}
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={reservation?.status === 'QUEUED' || (activeQueue && activeQueue > 1) ? handleGoToLiveSession : handleGoToLiveQueue}
-              className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
               <span>{reservation?.status === 'QUEUED' || (activeQueue && activeQueue > 1) ? 'Live Session' : 'Live Queue'}</span>
@@ -606,14 +595,14 @@ export const ReservationReceiptModal: React.FC = () => {
 
             <button
               onClick={handleBackToCockpit}
-              className="py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Car className="w-3.5 h-3.5 text-teal-400" />
               <span>Back to Cockpit</span>
             </button>
           </div>
 
-          {/* Tertiary Action: Get Turn-by-Turn Directions */}
+          {/* Navigation Link */}
           <button
             onClick={handleGetDirections}
             className="w-full py-1.5 px-3 rounded-xl text-teal-300 hover:text-white hover:bg-teal-500/10 text-[11px] font-mono tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer"

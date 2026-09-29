@@ -15,6 +15,7 @@ import { AuthModal } from "./components/auth/AuthModal";
 import { DirectionsModal } from "./components/modals/DirectionsModal";
 import { ReservationReceiptModal } from "./components/modals/ReservationReceiptModal";
 import { ReservationExpiredModal } from "./components/modals/ReservationExpiredModal";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { Zap, X, ArrowRight } from "lucide-react";
 
 export const App: React.FC = () => {
@@ -122,13 +123,15 @@ export const App: React.FC = () => {
 
         {/* Dynamic Screen Views */}
         <main className="flex-1 overflow-hidden flex flex-col relative min-w-0">
-          {currentView === "cockpit" && <CockpitView />}
-          {currentView === "find_charge" && <FindChargeView />}
-          {currentView === "reservation" && <ReservationView />}
-          {currentView === "queue" && <QueueView />}
-          {currentView === "charging" && <ActiveChargingView />}
-          {currentView === "history" && <HistoryView />}
-          {currentView === "settings" && <SettingsView />}
+          <ErrorBoundary fallbackTitle="View loading error">
+            {currentView === "cockpit" && <CockpitView />}
+            {currentView === "find_charge" && <FindChargeView />}
+            {currentView === "reservation" && <ReservationView />}
+            {currentView === "queue" && <QueueView />}
+            {currentView === "charging" && <ActiveChargingView />}
+            {currentView === "history" && <HistoryView />}
+            {currentView === "settings" && <SettingsView />}
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -140,7 +143,9 @@ export const App: React.FC = () => {
 
       {/* Global Directions, Receipt & Expired Reservation Modals */}
       <DirectionsModal />
-      <ReservationReceiptModal />
+      <ErrorBoundary fallbackTitle="Receipt Display Error">
+        <ReservationReceiptModal />
+      </ErrorBoundary>
       <ReservationExpiredModal />
     </div>
   );
