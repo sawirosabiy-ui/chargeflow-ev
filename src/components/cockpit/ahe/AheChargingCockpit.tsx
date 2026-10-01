@@ -6,8 +6,6 @@ import { AheStation3DStage } from "./AheStation3DStage";
 import { AheBatteryHUD } from "./AheBatteryHUD";
 import { AheVehicleSelector } from "./AheVehicleSelector";
 import { AheCameraControls } from "./AheCameraControls";
-import { AheActionButtons } from "./AheActionButtons";
-import { AheCompactChargingCard } from "./AheCompactChargingCard";
 import { AheSessionModal } from "./AheSessionModal";
 import { 
   AlertCircle, 
@@ -261,7 +259,7 @@ export const AheChargingCockpit: React.FC = () => {
         onUserInteraction={() => setAutoRotate(false)}
       />
 
-      {/* 2. TOP CHARGING STATUS CARD (Apple Vision Pro Dark Glass Panel) */}
+      {/* 2. TOP CHARGING STATUS CARD (Apple Vision Pro Glass HUD) */}
       <AheBatteryHUD
         batterySoc={batterySoc}
         powerKw={powerKw}
@@ -273,32 +271,21 @@ export const AheChargingCockpit: React.FC = () => {
         onToggleAutoRotate={() => setAutoRotate(!autoRotate)}
       />
 
-      {/* 3. RIGHT-SIDE VERTICAL CAMERA CONTROLS (+ / - / ↻) */}
+      {/* 3. UPPER-RIGHT CAMERA CONTROLS (+ / - / ↻) */}
       <AheCameraControls
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onReset={handleResetCamera}
       />
 
-      {/* 4. COMPACT CHARGING INFORMATION PANEL (Under Vehicle) */}
-      <AheCompactChargingCard
-        batterySoc={batterySoc}
-        powerKw={powerKw}
-        timeRemainingMin={timeRemainingMin}
-        isCharging={isCharging}
-      />
-
-      {/* 5. BOTTOM VEHICLE SELECTOR & COLOR SWATCHES */}
-      <AheVehicleSelector />
-
-      {/* 6. BOTTOM-RIGHT ACTION BUTTONS: START / STOP */}
-      <AheActionButtons
+      {/* 4. UNIFIED BOTTOM CONTROL DOCK (Vehicle Carousel + Live Colors + Start/Stop Action) */}
+      <AheVehicleSelector
         isCharging={isCharging}
         onStartCharging={handleStart}
         onStopCharging={handleStop}
       />
 
-      {/* 7. PREREQUISITE WARNING CARD (Shown only if no active session or reservation) */}
+      {/* 5. PREREQUISITE WARNING CARD (Shown only if no active session or reservation) */}
       {!hasActiveSession && (
         <div className={`absolute top-28 sm:top-24 inset-x-3 sm:inset-x-auto sm:left-6 z-30 pointer-events-auto sm:max-w-sm rounded-2xl p-4 backdrop-blur-xl shadow-2xl border animate-in fade-in slide-in-from-top-3 ${
           isCream
@@ -341,7 +328,7 @@ export const AheChargingCockpit: React.FC = () => {
         </div>
       )}
 
-      {/* 8. SESSION SUMMARY MODAL */}
+      {/* 6. SESSION SUMMARY MODAL */}
       <AheSessionModal
         isOpen={isSessionModalOpen}
         onClose={() => setIsSessionModalOpen(false)}
@@ -351,7 +338,7 @@ export const AheChargingCockpit: React.FC = () => {
         batterySoc={batterySoc}
       />
 
-      {/* 9. STOP CHARGING CONFIRMATION DIALOG */}
+      {/* 7. STOP CHARGING CONFIRMATION DIALOG */}
       {isStopChargingConfirmOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
           <div className={`border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 animate-in zoom-in-95 duration-200 shadow-2xl text-center ${
@@ -400,7 +387,7 @@ export const AheChargingCockpit: React.FC = () => {
         </div>
       )}
 
-      {/* 10. 4-DIGIT DISPENSER UNLOCK PIN MODAL */}
+      {/* 8. 4-DIGIT DISPENSER UNLOCK PIN MODAL */}
       {isPinModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
           <div className={`relative border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-4 animate-in zoom-in-95 duration-200 shadow-[0_0_50px_rgba(45,212,191,0.25)] text-center ${
