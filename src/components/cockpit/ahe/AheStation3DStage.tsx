@@ -1,11 +1,9 @@
 import React, { useMemo, useEffect, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { Check } from "lucide-react";
 import { VehicleStage } from "../../canvas/VehicleStage";
 import { ChargingEnvironment } from "../../canvas/charging-bay";
 import { useChargeFlowStore } from "../../../store/useChargeFlowStore";
-import { VEHICLE_COLORS } from "../../../data/cars";
 
 interface AheStation3DStageProps {
   isCharging: boolean;
@@ -17,7 +15,7 @@ interface AheStation3DStageProps {
   onUserInteraction?: () => void;
 }
 
-// Active camera responder component inside Canvas to handle window resizes & mobile device aspect ratio changes immediately
+// Active camera responder inside Canvas to handle window resize & mobile device aspect ratio changes
 const ResponsiveCamera: React.FC<{
   position: [number, number, number];
   fov: number;
@@ -41,10 +39,11 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
   batterySoc = 66,
   onUserInteraction,
 }) => {
-  const { vehicle, theme, setVehicleColor } = useChargeFlowStore();
-  const isCream = theme === 'cream';
+  const { vehicle, theme } = useChargeFlowStore();
   const isComplete = batterySoc >= 100;
   const isActivelyCharging = isCharging && !isComplete;
+
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const [viewport, setViewport] = useState(() => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
@@ -65,66 +64,63 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
   const isMobile = viewport.width < 640;
   const aspect = viewport.width / (viewport.height || 1);
 
-  // Dynamic responsive framing for any device width and aspect ratio
-  // On desktop: standard eye-level studio framing (fov 34, Z 4.8, stageScale 1.0)
-  // On mobile / tablet portrait: adaptively adjust fov and camera position so the car looks bold and prominent, filling ~86% of the screen width without clipping.
-  let cameraZ = 4.45;
-  let cameraY = 0.42;
+  // Responsive camera framing:
+  // Vehicle occupies 55–65% of available 3D scene height on mobile with comfortable breathing room.
+  let cameraZ = 4.3;
+  let cameraY = 0.46;
   let baseFov = 34;
   let stageScale = 1.0;
-  let stageY = -0.56;
-  let centerX = 0.08;
+  let stageY = -0.48;
+  let centerX = 0.0;
 
   if (aspect < 1.15) {
-    // Portrait / Square mobile & tablet devices
-    const targetFillRatio = isMobile ? 0.88 : 0.84;
-    // Effective car width in world units ~3.45m with scale 1.95
-    const targetVisibleWidth = 3.20 / targetFillRatio;
-    cameraZ = isMobile ? 4.7 : 4.6;
-    cameraY = isMobile ? 0.20 : 0.32;
-    stageY = isMobile ? -0.10 : -0.32;
-    centerX = 0.0;
-    stageScale = isMobile ? 0.94 : 0.98;
-
-    // Calculate exact vertical FOV to maintain horizontal coverage = targetVisibleWidth
-    const tanHalfVFov = targetVisibleWidth / (2 * cameraZ * aspect);
-    baseFov = (2 * Math.atan(tanHalfVFov) * 180) / Math.PI;
+    // Mobile Portrait / Tablet:
+    cameraZ = isMobile ? 4.5 : 4.4;
+    cameraY = isMobile ? 0.32 : 0.38;
+    stageY = isMobile ? -0.22 : -0.36;
+    stageScale = isMobile ? 0.96 : 1.0;
+    baseFov = isMobile ? 38 : 35;
   }
 
   const cameraFov = baseFov / (zoom || 1.0);
   const cameraPosition: [number, number, number] = [centerX, cameraY, cameraZ];
 
-  // Map angle preset index to vehicle rotation angle (only the car turns, camera and background stay completely still)
+  // Default camera angle: 3/4 rear beauty angle
   const targetRotation = useMemo(() => {
     switch (activeAngleIndex) {
       case 0:
-        return -Math.PI / 1.12; // 3/4 Front Beauty
+        return -Math.PI / 1.15; // 3/4 Rear-Side Beauty Angle
       case 1:
         return Math.PI; // Front Direct
       case 2:
         return -Math.PI / 2; // Side Profile
       case 3:
-        return 0; // Rear View
+        return 0; // Direct Rear
       default:
-        return -Math.PI / 1.12;
+        return -Math.PI / 1.15;
     }
   }, [activeAngleIndex]);
 
+  const handleInteraction = () => {
+    if (!hasInteracted) setHasInteracted(true);
+    if (onUserInteraction) onUserInteraction();
+  };
+
   return (
     <div className="absolute inset-0 z-0 overflow-hidden select-none">
-      {/* 1. ORIGINAL STATION BACKGROUND IMAGE (Completely still, never moves) */}
+      {/* 1. Cinematic Nighttime Architectural EV Facility Backdrop */}
       <div
         className="absolute inset-0 bg-cover bg-center pointer-events-none"
         style={{
           backgroundImage: `url('/images/ahe_image.png')`,
         }}
       >
-        {isActivelyCharging && (
-          <div className="absolute inset-0 bg-teal-500/5 mix-blend-screen pointer-events-none animate-pulse" />
-        )}
+        {/* Subtle ambient nighttime facility vignette */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#070B12] via-transparent to-[#070B12]/80 pointer-events-none" />
+        <div className="absolute inset-0 bg-radial-vignette opacity-40 pointer-events-none" />
       </div>
 
-      {/* 2. Interactive Three.js 3D Layer: Stationary Stage & Car-Only 360 Rotation */}
+      {/* 2. Interactive Three.js 3D Layer: Stationary Architectural Stage & Car-Only 360 Rotation */}
       <div className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing touch-pan-y">
         <Canvas
           className="w-full h-full"
@@ -140,6 +136,8 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
             powerPreference: "high-performance",
             stencil: false,
             depth: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.05,
           }}
           shadows
         >
@@ -156,10 +154,10 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
               showEnergy={isActivelyCharging}
               showBackdrop={false}
               autoRotate={autoRotate}
-              autoRotateSpeed={1.2}
-              initialRotation={-Math.PI / 1.12}
+              autoRotateSpeed={0.8}
+              initialRotation={-Math.PI / 1.15}
               targetRotation={targetRotation}
-              onUserInteraction={onUserInteraction}
+              onUserInteraction={handleInteraction}
             >
               <VehicleStage
                 key={`${vehicle.id}-${vehicle.paintColor || '#0284c7'}`}
@@ -175,43 +173,16 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
         </Canvas>
       </div>
 
-      {/* 3. Floating Studio Swatch Bar (Option 1: 1-Tap Live Exterior Color Swatches in Cockpit) */}
-      <div className="absolute bottom-20 sm:bottom-24 xl:bottom-24 left-1/2 -translate-x-1/2 z-20 pointer-events-auto select-none">
-        <div className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-full border backdrop-blur-2xl transition-all shadow-xl ${
-          isCream
-            ? 'bg-[#FAF7F2]/90 border-amber-900/15 text-slate-800 shadow-[0_10px_30px_rgba(40,20,10,0.15)]'
-            : 'bg-[#08101E]/85 border-teal-500/30 text-white shadow-[0_10px_30px_rgba(0,0,0,0.7)]'
-        }`}>
-          {VEHICLE_COLORS.map((color) => {
-            const isSelected = (vehicle.paintColor || '#0284c7').toLowerCase() === color.hex.toLowerCase();
-            const isLight = color.id === 'white' || color.id === 'silver';
-            return (
-              <button
-                key={color.id}
-                type="button"
-                onClick={() => setVehicleColor(color.hex, color.name)}
-                title={`Vehicle Color: ${color.name}`}
-                className={`relative w-6 h-6 rounded-full transition-all duration-150 cursor-pointer flex items-center justify-center shrink-0 ${
-                  isSelected
-                    ? 'scale-110 ring-2 ring-teal-400 ring-offset-2 shadow-[0_0_12px_rgba(45,212,191,0.6)]'
-                    : 'hover:scale-105 opacity-80 hover:opacity-100'
-                } ${isCream ? 'ring-offset-[#FAF7F2]' : 'ring-offset-[#070D1A]'}`}
-                style={{
-                  backgroundColor: color.hex,
-                  border: `1px solid ${color.borderHex || 'rgba(255,255,255,0.2)'}`,
-                }}
-              >
-                {isSelected && (
-                  <Check
-                    className={`w-3 h-3 ${isLight ? 'text-slate-950' : 'text-white'}`}
-                    strokeWidth={3}
-                  />
-                )}
-              </button>
-            );
-          })}
+      {/* 3. Subtle "↔ DRAG TO ROTATE ↔" Hint (Fades out smoothly upon user drag) */}
+      {!hasInteracted && !autoRotate && (
+        <div className="absolute top-[64%] sm:top-[66%] left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-pulse transition-opacity duration-700">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-slate-300 text-[10px] font-mono tracking-widest uppercase">
+            <span className="text-teal-400">↔</span>
+            <span>DRAG TO ROTATE</span>
+            <span className="text-teal-400">↔</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

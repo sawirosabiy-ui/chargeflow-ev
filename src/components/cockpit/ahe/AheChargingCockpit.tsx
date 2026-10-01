@@ -4,26 +4,19 @@ import { getUserActiveReservation } from "../../../data/db";
 import { useTranslation } from "../../../localization/useTranslation";
 import { AheStation3DStage } from "./AheStation3DStage";
 import { AheBatteryHUD } from "./AheBatteryHUD";
-import { AheChargingModeCard } from "./AheChargingModeCard";
 import { AheVehicleSelector } from "./AheVehicleSelector";
-import { AheLiveDataCard } from "./AheLiveDataCard";
 import { AheCameraControls } from "./AheCameraControls";
 import { AheActionButtons } from "./AheActionButtons";
+import { AheCompactChargingCard } from "./AheCompactChargingCard";
 import { AheSessionModal } from "./AheSessionModal";
-import { AheHologramFloor } from "./AheHologramFloor";
-import { AICopilotModal } from "../../copilot/AICopilotModal";
 import { 
-  Hand, 
   AlertCircle, 
   ArrowRight, 
   Zap, 
-  Lock, 
   KeyRound, 
   Timer, 
   ShieldCheck, 
   X, 
-  Delete, 
-  FileText,
   ClipboardPaste
 } from "lucide-react";
 
@@ -38,7 +31,6 @@ export const AheChargingCockpit: React.FC = () => {
     verifyAndStartCharging,
     openReceiptModal,
     stopChargingSession,
-    confirmReservation,
     cancelActiveReservation,
     setView,
     theme,
@@ -62,7 +54,7 @@ export const AheChargingCockpit: React.FC = () => {
   const elapsedSeconds = chargingSession.elapsedSeconds || 0;
   const timeRemainingMin = isActivelyCharging ? Math.max(1, Math.round((100 - batterySoc) * 0.35)) : 0;
 
-  // 3D Camera navigation state (controls 3D camera FOV/angle without moving background)
+  // 3D Camera navigation state
   const [zoom, setZoom] = useState(1.0);
   const [autoRotate, setAutoRotate] = useState(false);
   const [activeAngleIndex, setActiveAngleIndex] = useState(0);
@@ -199,7 +191,6 @@ export const AheChargingCockpit: React.FC = () => {
     } catch {
       // ignore clipboard permission error
     }
-    // Fallback: If user has an active reservation PIN
     if (activeReservation?.authCode) {
       setPinInput(activeReservation.authCode);
       setPinError(null);
@@ -207,7 +198,6 @@ export const AheChargingCockpit: React.FC = () => {
     }
   };
 
-  // Physical keyboard support for 4-digit PIN entry
   useEffect(() => {
     if (!isPinModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -225,7 +215,6 @@ export const AheChargingCockpit: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isPinModalOpen, pinInput]);
 
-  // Handlers for charging session
   const handleStart = () => {
     if (isCharging) return;
     const activeRes = reservation || (user?.id ? getUserActiveReservation(user.id) : null);
@@ -233,7 +222,6 @@ export const AheChargingCockpit: React.FC = () => {
       setUnauthorizedModalOpen(true, 'Bay 03', 'Addis EV Hub (Bole)');
       return;
     }
-    // Prompt for 4-digit dispenser unlock PIN from receipt
     setPinInput('');
     setPinError(null);
     setIsPinModalOpen(true);
@@ -243,9 +231,8 @@ export const AheChargingCockpit: React.FC = () => {
     setStopChargingConfirmOpen(true);
   };
 
-  // Zoom handlers for 3D Camera
   const handleZoomIn = () => {
-    setZoom((prev) => Math.min(1.4, +(prev + 0.1).toFixed(2)));
+    setZoom((prev) => Math.min(1.35, +(prev + 0.1).toFixed(2)));
   };
 
   const handleZoomOut = () => {
@@ -258,17 +245,13 @@ export const AheChargingCockpit: React.FC = () => {
     setActiveAngleIndex(0);
   };
 
-  const handleSelectAngle = (idx: number) => {
-    setActiveAngleIndex(idx);
-  };
-
   const calculatedCostEtb = energyDeliveredKwh * 19.50 + (energyDeliveredKwh > 0 ? 4.50 : 0);
 
   return (
     <div className={`relative w-full h-full overflow-hidden select-none font-sans transition-colors duration-300 ${
       isCream ? "bg-[#FAF7F2] text-slate-900" : "bg-[#070B12] text-slate-100"
     }`}>
-      {/* 1. 3D WEBGL STAGE ON ARCHITECTURAL BACKDROP */}
+      {/* 1. 3D WEBGL HERO STAGE (Grounded Architectural Floor + Realistic Vehicle) */}
       <AheStation3DStage
         isCharging={isCharging}
         autoRotate={autoRotate}
@@ -278,49 +261,44 @@ export const AheChargingCockpit: React.FC = () => {
         onUserInteraction={() => setAutoRotate(false)}
       />
 
-      {/* 2. IN-CANVAS HEADER: Bay & Minimal Status Badge (Desktop Only, unified into AheBatteryHUD on mobile) */}
-      <div className="hidden sm:flex absolute top-4 inset-x-6 z-20 items-center justify-between pointer-events-none">
-        {/* Left: Bay & Minimal Charging Status Badge (No 'wireless' label) */}
-        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
-          <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full backdrop-blur-xl shadow-lg border transition-all ${
-            isCream 
-              ? "bg-[#FAF7F2]/90 border-amber-900/15 text-slate-800"
-              : "bg-[#08101E]/85 border-teal-500/30 text-white"
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-[#2DD4BF] animate-pulse shrink-0" />
-            <span className="text-[11px] sm:text-xs font-black tracking-wide font-sans truncate max-w-[85px] sm:max-w-none">
-              {reservation?.bayNumber || `${t.bayLabel} 03`}
-            </span>
-            <span className="text-slate-400">•</span>
-            <span className="text-[10px] sm:text-[11px] font-mono text-[#0D9488] dark:text-teal-300 font-semibold truncate">
-              {isCharging ? t.chargingTitle : t.ready} ({Math.round(batterySoc)}%)
-            </span>
-          </div>
-        </div>
+      {/* 2. TOP CHARGING STATUS CARD (Apple Vision Pro Dark Glass Panel) */}
+      <AheBatteryHUD
+        batterySoc={batterySoc}
+        powerKw={powerKw}
+        voltage={voltage}
+        timeRemainingMin={timeRemainingMin}
+        isCharging={isCharging}
+        bayNumber={reservation?.bayNumber || `${t.bayLabel} 03`}
+        autoRotate={autoRotate}
+        onToggleAutoRotate={() => setAutoRotate(!autoRotate)}
+      />
 
-        {/* Right: Drag to Rotate Hint */}
-        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
-          <button
-            onClick={() => setAutoRotate(!autoRotate)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full backdrop-blur-xl text-xs font-semibold transition-all shadow-lg group cursor-pointer border ${
-              isCream
-                ? "bg-[#FAF7F2]/90 hover:bg-[#F3EFEA] border-amber-900/15 text-amber-900"
-                : "bg-[#08101E]/85 hover:bg-[#0E1B33] border-teal-500/30 text-teal-300"
-            }`}
-            title="Toggle 360° Car Rotation"
-          >
-            <Hand className="w-3.5 h-3.5 text-[#2DD4BF] group-hover:rotate-12 transition-transform shrink-0" />
-            <span className="tracking-wider uppercase text-[10px] font-bold hidden sm:inline">
-              {autoRotate ? t.autoOrbiting : t.dragToRotate}
-            </span>
-            <span className="tracking-wider uppercase text-[10px] font-bold sm:hidden">
-              {autoRotate ? '360°' : 'Rotate'}
-            </span>
-          </button>
-        </div>
-      </div>
+      {/* 3. RIGHT-SIDE VERTICAL CAMERA CONTROLS (+ / - / ↻) */}
+      <AheCameraControls
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onReset={handleResetCamera}
+      />
 
-      {/* 3. PREREQUISITE WARNING CARD (Shown only if no active session or reservation) */}
+      {/* 4. COMPACT CHARGING INFORMATION PANEL (Under Vehicle) */}
+      <AheCompactChargingCard
+        batterySoc={batterySoc}
+        powerKw={powerKw}
+        timeRemainingMin={timeRemainingMin}
+        isCharging={isCharging}
+      />
+
+      {/* 5. BOTTOM VEHICLE SELECTOR & COLOR SWATCHES */}
+      <AheVehicleSelector />
+
+      {/* 6. BOTTOM-RIGHT ACTION BUTTONS: START / STOP */}
+      <AheActionButtons
+        isCharging={isCharging}
+        onStartCharging={handleStart}
+        onStopCharging={handleStop}
+      />
+
+      {/* 7. PREREQUISITE WARNING CARD (Shown only if no active session or reservation) */}
       {!hasActiveSession && (
         <div className={`absolute top-28 sm:top-24 inset-x-3 sm:inset-x-auto sm:left-6 z-30 pointer-events-auto sm:max-w-sm rounded-2xl p-4 backdrop-blur-xl shadow-2xl border animate-in fade-in slide-in-from-top-3 ${
           isCream
@@ -363,58 +341,7 @@ export const AheChargingCockpit: React.FC = () => {
         </div>
       )}
 
-      {/* 4. TOP-LEFT FLOATING BATTERY & POWER HUD CARD (Unified Sleek Bar on Mobile, Vertical Card on Desktop) */}
-      <AheBatteryHUD
-        batterySoc={batterySoc}
-        powerKw={powerKw}
-        voltage={voltage}
-        timeRemainingMin={timeRemainingMin}
-        isCharging={isCharging}
-        bayNumber={reservation?.bayNumber || `${t.bayLabel} 03`}
-        autoRotate={autoRotate}
-        onToggleAutoRotate={() => setAutoRotate(!autoRotate)}
-      />
-
-      {/* 5. MID-LEFT CHARGING MODE & BATTERY STATUS CARD */}
-      <div className="hidden md:block pointer-events-none">
-        <AheChargingModeCard batterySoc={batterySoc} isCharging={isCharging} />
-      </div>
-
-      {/* 6. BOTTOM-LEFT VEHICLE SWITCHER & LOCATION BADGE */}
-      <AheVehicleSelector />
-
-      {/* 7. MID-RIGHT LIVE DATA TELEMETRY CARD */}
-      <div className="hidden lg:block pointer-events-none">
-        <AheLiveDataCard
-          powerKw={powerKw}
-          voltage={voltage}
-          timeRemainingMin={timeRemainingMin}
-          isCharging={isCharging}
-        />
-      </div>
-
-      {/* 7.5 HOLOGRAPHIC ENERGY FLOOR PROJECTION (Grounds stage to wet terrace tiles) */}
-      <AheHologramFloor batterySoc={batterySoc} isCharging={isCharging} />
-
-      {/* 8. BOTTOM-CENTER CAMERA & ROTATION CONTROLS PILL */}
-      <AheCameraControls
-        autoRotate={autoRotate}
-        onToggleAutoRotate={() => setAutoRotate(!autoRotate)}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onReset={handleResetCamera}
-        activeDotIndex={activeAngleIndex}
-        onSelectDot={handleSelectAngle}
-      />
-
-      {/* 9. BOTTOM-RIGHT ACTION BUTTONS: START & STOP */}
-      <AheActionButtons
-        isCharging={isCharging}
-        onStartCharging={handleStart}
-        onStopCharging={handleStop}
-      />
-
-      {/* 10. SESSION SUMMARY MODAL (Routes to Step 08 History) */}
+      {/* 8. SESSION SUMMARY MODAL */}
       <AheSessionModal
         isOpen={isSessionModalOpen}
         onClose={() => setIsSessionModalOpen(false)}
@@ -424,7 +351,7 @@ export const AheChargingCockpit: React.FC = () => {
         batterySoc={batterySoc}
       />
 
-      {/* 10.25 STOP CHARGING CONFIRMATION DIALOG */}
+      {/* 9. STOP CHARGING CONFIRMATION DIALOG */}
       {isStopChargingConfirmOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
           <div className={`border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 animate-in zoom-in-95 duration-200 shadow-2xl text-center ${
@@ -473,7 +400,7 @@ export const AheChargingCockpit: React.FC = () => {
         </div>
       )}
 
-      {/* 10.4 4-DIGIT DISPENSER UNLOCK PIN MODAL (Enforces 1-hour code validity) */}
+      {/* 10. 4-DIGIT DISPENSER UNLOCK PIN MODAL */}
       {isPinModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
           <div className={`relative border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-4 animate-in zoom-in-95 duration-200 shadow-[0_0_50px_rgba(45,212,191,0.25)] text-center ${
@@ -483,7 +410,6 @@ export const AheChargingCockpit: React.FC = () => {
               ? "bg-[#FAF7F2] border-teal-600/30 text-slate-900" 
               : "bg-[#090F1C] border-teal-400/40 text-white"
           }`}>
-            {/* Close Button */}
             <button 
               onClick={() => setIsPinModalOpen(false)}
               className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
@@ -491,12 +417,10 @@ export const AheChargingCockpit: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
 
-            {/* Glowing Icon Badge */}
             <div className="w-14 h-14 rounded-2xl bg-teal-500/15 border border-teal-400/40 flex items-center justify-center mx-auto text-teal-400 shadow-[0_0_25px_rgba(45,212,191,0.35)]">
               <KeyRound className="w-7 h-7 stroke-[2.5]" />
             </div>
 
-            {/* Header & Subtitle */}
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-teal-500/15 border border-teal-400/30 text-teal-300 font-mono text-[10px] font-bold uppercase tracking-wider">
                 <ShieldCheck className="w-3 h-3" />
@@ -509,7 +433,6 @@ export const AheChargingCockpit: React.FC = () => {
                 Enter the 4-digit code from your reservation receipt to unlock <strong className="text-teal-400">{activeReservation?.bayNumber || 'Bay 03'}</strong>.
               </p>
 
-              {/* 1-Hour Validity Countdown Pill */}
               {pinRemainingSec !== null && (
                 <div className="pt-1">
                   {pinRemainingSec > 0 ? (
@@ -527,7 +450,6 @@ export const AheChargingCockpit: React.FC = () => {
               )}
             </div>
 
-            {/* 4 Digit Boxes */}
             <div className="flex items-center justify-center gap-2.5 sm:gap-3 py-1">
               {[0, 1, 2, 3].map((index) => {
                 const char = pinInput[index];
@@ -549,7 +471,6 @@ export const AheChargingCockpit: React.FC = () => {
               })}
             </div>
 
-            {/* Paste / Auto-fill helper */}
             <div className="flex items-center justify-center">
               <button
                 type="button"
@@ -562,7 +483,6 @@ export const AheChargingCockpit: React.FC = () => {
               </button>
             </div>
 
-            {/* Error Message */}
             {pinError && (
               <div className="text-rose-400 text-xs font-semibold px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 animate-in fade-in flex items-center justify-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -570,7 +490,6 @@ export const AheChargingCockpit: React.FC = () => {
               </div>
             )}
 
-            {/* High-Tech Virtual Numeric Keypad */}
             <div className="grid grid-cols-3 gap-1.5 pt-1 max-w-[260px] mx-auto">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
                 <button
@@ -600,89 +519,15 @@ export const AheChargingCockpit: React.FC = () => {
               <button
                 type="button"
                 onClick={handlePinDelete}
-                className="h-10 rounded-xl bg-white/5 hover:bg-rose-500/20 active:scale-95 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-300 font-mono text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                className="h-10 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-400 font-mono text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
                 title="Backspace"
               >
-                <Delete className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Bottom Actions: View Ticket / Start */}
-            <div className="space-y-2 pt-2 border-t border-white/10">
-              <button
-                type="button"
-                disabled={pinInput.length !== 4}
-                onClick={() => submitPin(pinInput)}
-                className={`w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
-                  pinInput.length === 4
-                    ? 'bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 shadow-[0_0_20px_rgba(45,212,191,0.35)] scale-[1.01]'
-                    : 'bg-white/10 text-slate-500 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <Zap className="w-4 h-4 fill-current" />
-                UNLOCK &amp; START CHARGING
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPinModalOpen(false);
-                  openReceiptModal();
-                }}
-                className="w-full py-1.5 px-3 text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                View Reservation Ticket (Forgot PIN?)
+                ⌫
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* 10.5 CHARGING AUTHORIZATION BLOCKED MODAL */}
-      {unauthorizedModal?.isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
-          <div className={`border rounded-3xl p-6 sm:p-7 max-w-sm w-full space-y-5 animate-in zoom-in-95 duration-200 shadow-2xl text-center ${
-            isCream 
-              ? "bg-[#FAF7F2] border-amber-900/15 text-slate-900" 
-              : "bg-[#0B1220] border-rose-500/30 text-white"
-          }`}>
-            <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
-              <Lock className="w-7 h-7 stroke-[2.5]" />
-            </div>
-
-            <div className="space-y-2">
-              <div className="inline-block px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono text-[10px] font-bold uppercase tracking-wider">
-                Charging Not Authorized
-              </div>
-              <h3 className="text-xl font-black tracking-tight uppercase">
-                CHARGING NOT AUTHORIZED
-              </h3>
-              <p className={`text-xs leading-relaxed ${isCream ? "text-slate-600" : "text-slate-300"}`}>
-                You need an active reservation before you can start charging. Please find a charger and complete the reservation process first.
-              </p>
-              <div className="pt-1 text-xs font-mono font-bold text-teal-400">
-                Reservation fee: 50 ETB
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={() => {
-                  setUnauthorizedModalOpen(false);
-                  setView('find_charge');
-                }}
-                className="w-full py-3.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer"
-              >
-                FIND A CHARGER
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 11. AI COPILOT CHATBOT ASSISTANT */}
-      <AICopilotModal />
     </div>
   );
 };
