@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
@@ -12,9 +12,11 @@ interface ReplicaCircularStageProps {
 
 /**
  * Premium Architectural Contactless Charging Floor
- * - Replaces the old sci-fi circular UFO platform with a subtle, physically grounded architectural surface.
- * - Flat wet architectural floor with realistic contact shadows.
- * - Subtle recessed contactless charging pad directly beneath the vehicle with restrained teal/emerald edge illumination.
+ * Matches exact mobile visual reference (phone charging.png):
+ * - Dark circular platform stage
+ * - Concentric glowing cyan/teal neon rings (inner & outer)
+ * - Photorealistic contact shadows under vehicle tires
+ * - Subtle inductive charging core
  */
 export const ReplicaCircularStage: React.FC<ReplicaCircularStageProps> = ({
   isCharging = false,
@@ -26,149 +28,107 @@ export const ReplicaCircularStage: React.FC<ReplicaCircularStageProps> = ({
   const isComplete = batterySoc >= 100;
   const isActivelyCharging = isCharging && !isComplete;
 
-  const padEdgeGlowRef = useRef<THREE.MeshBasicMaterial>(null);
-  const padCenterGridRef = useRef<THREE.MeshStandardMaterial>(null);
+  const outerRingRef = useRef<THREE.MeshBasicMaterial>(null);
+  const innerRingRef = useRef<THREE.MeshBasicMaterial>(null);
 
   useFrame(({ clock }) => {
     const elapsed = clock.getElapsedTime();
 
-    if (padEdgeGlowRef.current) {
+    if (outerRingRef.current) {
       if (isActivelyCharging) {
-        // Very subtle, gentle breathing pulse
-        const pulse = Math.sin(elapsed * 2.0) * 0.2 + 0.65;
-        padEdgeGlowRef.current.opacity = pulse;
+        // Gentle breathing pulse
+        const pulse = Math.sin(elapsed * 2.0) * 0.2 + 0.75;
+        outerRingRef.current.opacity = pulse;
       } else if (isComplete) {
-        padEdgeGlowRef.current.opacity = 0.7;
+        outerRingRef.current.opacity = 0.85;
       } else {
-        padEdgeGlowRef.current.opacity = 0.35;
+        outerRingRef.current.opacity = 0.55;
       }
     }
 
-    if (padCenterGridRef.current) {
+    if (innerRingRef.current) {
       if (isActivelyCharging) {
-        const pulse = Math.sin(elapsed * 2.2) * 0.15 + 0.35;
-        padCenterGridRef.current.emissiveIntensity = pulse;
+        const pulse = Math.sin(elapsed * 2.5 + 1.0) * 0.2 + 0.8;
+        innerRingRef.current.opacity = pulse;
+      } else if (isComplete) {
+        innerRingRef.current.opacity = 0.9;
       } else {
-        padCenterGridRef.current.emissiveIntensity = 0.1;
+        innerRingRef.current.opacity = 0.6;
       }
     }
   });
 
-  // Procedural soft feathered radial contact shadow texture for under-chassis depth
-  const ambientShadowTex = useMemo(() => {
-    if (typeof document === 'undefined') return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    const gradient = ctx.createRadialGradient(256, 256, 60, 256, 256, 250);
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.95)');
-    gradient.addColorStop(0.35, 'rgba(2, 6, 14, 0.75)');
-    gradient.addColorStop(0.65, 'rgba(3, 8, 18, 0.35)');
-    gradient.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 512, 512);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
-  }, []);
+  const ringColor = isActivelyCharging ? '#2DD4BF' : isComplete ? '#10B981' : '#0D9488';
 
   return (
     <group position={position} name="ArchitecturalChargingFloor">
-      {/* 1. Master Architectural Ground Plane (Dark Wet Architectural Terrace Floor) */}
-      <mesh position={[0, -0.008, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[24, 24]} />
+      {/* 1. Master Ground Plane (Blends seamlessly with station background) */}
+      <mesh position={[0, -0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[30, 30]} />
         <meshStandardMaterial
           color={isCream ? '#DFD8CC' : '#070B12'}
-          roughness={isCream ? 0.6 : 0.38}
-          metalness={isCream ? 0.05 : 0.25}
+          roughness={isCream ? 0.6 : 0.4}
+          metalness={isCream ? 0.05 : 0.3}
           envMapIntensity={isCream ? 0.4 : 0.8}
         />
       </mesh>
 
-      {/* 2. Soft Radial Ambient Occlusion Ground Shadow */}
-      {ambientShadowTex && (
-        <mesh position={[0, -0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[5.2, 3.8]} />
-          <meshBasicMaterial
-            map={ambientShadowTex}
-            transparent
-            opacity={0.88}
-            depthWrite={false}
-          />
-        </mesh>
-      )}
+      {/* 2. Main Circular Stage Disc Pedestal */}
+      <mesh position={[0, -0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[2.7, 64]} />
+        <meshStandardMaterial
+          color={isCream ? '#EDE8DE' : '#0B111E'}
+          roughness={0.3}
+          metalness={0.7}
+        />
+      </mesh>
 
       {/* 3. Photorealistic Contact Shadow Layer beneath Vehicle Wheels & Body */}
       <ContactShadows
-        position={[0, -0.004, 0]}
-        opacity={0.85}
-        scale={6.0}
-        blur={1.6}
+        position={[0, -0.003, 0]}
+        opacity={0.88}
+        scale={6.2}
+        blur={1.5}
         far={2.2}
         resolution={1024}
         color={isCream ? '#4A3B32' : '#000000'}
       />
 
-      {/* 4. Subtle Recessed Contactless Charging Surface (Directly beneath vehicle) */}
-      <group position={[0, -0.002, 0]}>
-        {/* Outer Chamfered Dark Metal Frame Bezel */}
-        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[2.52, 1.42]} />
-          <meshStandardMaterial
-            color={isCream ? '#C8C0B2' : '#111827'}
-            roughness={0.35}
-            metalness={0.85}
-          />
-        </mesh>
+      {/* 4. Concentric Glowing Neon Rings (Matches phone charging.png) */}
+      {/* Outer Glowing Neon Ring */}
+      <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[2.3, 2.34, 64]} />
+        <meshBasicMaterial
+          ref={outerRingRef}
+          color={ringColor}
+          transparent
+          opacity={0.7}
+          depthWrite={false}
+        />
+      </mesh>
 
-        {/* Dark Tinted Tempered Glass / Ceramic Inductive Plate */}
-        <mesh position={[0, 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[2.42, 1.32]} />
-          <meshStandardMaterial
-            ref={padCenterGridRef}
-            color={isCream ? '#EFEAE2' : '#060A12'}
-            roughness={0.2}
-            metalness={0.9}
-            emissive={isActivelyCharging ? '#0D9488' : '#042F2E'}
-            emissiveIntensity={isActivelyCharging ? 0.35 : 0.05}
-          />
-        </mesh>
+      {/* Inner Glowing Neon Ring */}
+      <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.35, 1.38, 64]} />
+        <meshBasicMaterial
+          ref={innerRingRef}
+          color={ringColor}
+          transparent
+          opacity={0.75}
+          depthWrite={false}
+        />
+      </mesh>
 
-        {/* Hairline Restrained Glowing Perimeter Indicator (Teal/Emerald) */}
-        <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.55, 0.58, 48]} />
-          <meshBasicMaterial
-            ref={padEdgeGlowRef}
-            color={isActivelyCharging ? '#2DD4BF' : isComplete ? '#10B981' : '#0D9488'}
-            transparent
-            opacity={isActivelyCharging ? 0.65 : 0.35}
-            depthWrite={false}
-          />
-        </mesh>
-
-        {/* Corner Alignment Hash Marks on Pad (Subtle Engineering Detail) */}
-        <mesh position={[-1.12, 0.002, -0.58]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.08, 0.08]} />
-          <meshBasicMaterial color={isActivelyCharging ? '#2DD4BF' : '#475569'} opacity={0.6} transparent />
-        </mesh>
-        <mesh position={[1.12, 0.002, -0.58]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.08, 0.08]} />
-          <meshBasicMaterial color={isActivelyCharging ? '#2DD4BF' : '#475569'} opacity={0.6} transparent />
-        </mesh>
-        <mesh position={[-1.12, 0.002, 0.58]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.08, 0.08]} />
-          <meshBasicMaterial color={isActivelyCharging ? '#2DD4BF' : '#475569'} opacity={0.6} transparent />
-        </mesh>
-        <mesh position={[1.12, 0.002, 0.58]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.08, 0.08]} />
-          <meshBasicMaterial color={isActivelyCharging ? '#2DD4BF' : '#475569'} opacity={0.6} transparent />
-        </mesh>
-      </group>
+      {/* Center Induction Pad Core Disc */}
+      <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.45, 0.48, 48]} />
+        <meshBasicMaterial
+          color={ringColor}
+          transparent
+          opacity={isActivelyCharging ? 0.9 : 0.4}
+          depthWrite={false}
+        />
+      </mesh>
     </group>
   );
 };
