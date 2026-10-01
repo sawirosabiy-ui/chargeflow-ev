@@ -65,21 +65,30 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
   const aspect = viewport.width / (viewport.height || 1);
 
   // Responsive camera framing:
-  // Vehicle occupies 55–65% of available 3D scene height on mobile with comfortable breathing room.
-  let cameraZ = 4.3;
-  let cameraY = 0.46;
+  // Dynamically computes camera distance, FOV, and stage height so the car occupies ~55–65% of the visual space on any phone screen size.
+  let cameraZ = 4.4;
+  let cameraY = 0.44;
   let baseFov = 34;
   let stageScale = 1.0;
-  let stageY = -0.48;
-  let centerX = 0.0;
+  let stageY = -0.46;
+  let carScale = 2.55;
+  const centerX = 0.0;
 
-  if (aspect < 1.15) {
-    // Mobile Portrait / Tablet:
-    cameraZ = isMobile ? 4.5 : 4.4;
-    cameraY = isMobile ? 0.32 : 0.38;
-    stageY = isMobile ? -0.22 : -0.36;
-    stageScale = isMobile ? 0.96 : 1.0;
-    baseFov = isMobile ? 38 : 35;
+  if (aspect < 1.05) {
+    // Mobile Portrait / Tall Screen Devices:
+    // Effective target visible width across vehicle wheelbase ~2.7m
+    const targetWidth = isMobile ? 2.65 : 3.0;
+    cameraZ = isMobile ? 4.8 : 4.6;
+    cameraY = isMobile ? 0.36 : 0.40;
+    stageY = isMobile ? -0.26 : -0.36;
+    stageScale = isMobile ? 0.94 : 0.98;
+    carScale = isMobile ? 2.25 : 2.45;
+
+    // Calculate vertical FOV to maintain horizontal coverage without edge clipping
+    const tanHalfVFov = targetWidth / (2 * cameraZ * aspect);
+    const calculatedFov = (2 * Math.atan(tanHalfVFov) * 180) / Math.PI;
+    // Keep FOV within a natural 34° - 48° range to prevent perspective distortion
+    baseFov = Math.max(34, Math.min(48, calculatedFov));
   }
 
   const cameraFov = baseFov / (zoom || 1.0);
@@ -110,17 +119,17 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
     <div className="absolute inset-0 z-0 overflow-hidden select-none">
       {/* 1. Cinematic Nighttime Architectural EV Facility Backdrop */}
       <div
-        className="absolute inset-0 bg-cover bg-center pointer-events-none"
+        className="absolute inset-0 bg-cover bg-center pointer-events-none transition-all duration-500"
         style={{
           backgroundImage: `url('/images/ahe_image.png')`,
         }}
       >
-        {/* Subtle ambient nighttime facility vignette */}
+        {/* Soft environmental lighting vignette that anchors the 3D stage */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#070B12] via-transparent to-[#070B12]/80 pointer-events-none" />
-        <div className="absolute inset-0 bg-radial-vignette opacity-40 pointer-events-none" />
+        <div className="absolute inset-0 bg-radial-vignette opacity-35 pointer-events-none" />
       </div>
 
-      {/* 2. Interactive Three.js 3D Layer: Stationary Architectural Stage & Car-Only 360 Rotation */}
+      {/* 2. Interactive Three.js 3D Layer: Grounded Architectural Stage & Car-Only 360 Rotation */}
       <div className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing touch-pan-y">
         <Canvas
           className="w-full h-full"
@@ -141,7 +150,7 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
           }}
           shadows
         >
-          {/* Synchronize camera dynamically on window resize or mobile rotation */}
+          {/* Synchronize camera dynamically on window resize or mobile orientation change */}
           <ResponsiveCamera position={cameraPosition} fov={cameraFov} />
 
           {/* Grounded stage placed at exact station terrace level with responsive scaling */}
@@ -163,7 +172,7 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
                 key={`${vehicle.id}-${vehicle.paintColor || '#0284c7'}`}
                 vehicleId={vehicle.id}
                 modelPath={vehicle.modelPath}
-                scale={2.60}
+                scale={carScale}
                 paintColor={vehicle.paintColor || "#0284c7"}
                 isCharging={isCharging}
                 showChargingPort={false}
@@ -173,10 +182,10 @@ export const AheStation3DStage: React.FC<AheStation3DStageProps> = ({
         </Canvas>
       </div>
 
-      {/* 3. Subtle "↔ DRAG TO ROTATE ↔" Hint (Fades out smoothly upon user drag) */}
+      {/* 3. Subtle "↔ DRAG TO ROTATE ↔" Hint (Disappears smoothly after user interaction) */}
       {!hasInteracted && !autoRotate && (
-        <div className="absolute top-[64%] sm:top-[66%] left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-pulse transition-opacity duration-700">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-slate-300 text-[10px] font-mono tracking-widest uppercase">
+        <div className="absolute top-[61%] sm:top-[63%] left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-pulse transition-opacity duration-700">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/10 text-slate-300 text-[10px] font-mono tracking-widest uppercase shadow-lg">
             <span className="text-teal-400">↔</span>
             <span>DRAG TO ROTATE</span>
             <span className="text-teal-400">↔</span>
